@@ -1,0 +1,6 @@
+{
+  "name": "PhysioLingo",
+  "description": "Grywalizowana aplikacja edukacyjna dla studentów fizjoterapii do nauki anatomii funkcjonalnej i klinicznej z interaktywnym modułem 3D.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

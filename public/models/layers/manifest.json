@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "source": "Z-Anatomy (CC BY-SA 4.0)",
+  "layers": [
+    "ligaments",
+    "arteries",
+    "veins",
+    "nerves",
+    "organs",
+    "skin"
+  ],
+  "regions": {
+    "full_body": {
+      "ligaments": {
+        "url": "/models/layers/full_body/ligaments.glb",
+        "meshes": 409,
+        "bytes": 700120
+      },
+      "arteries": {
+        "url": "/models/layers/full_body/arteries.glb",
+        "meshes": 426,
+        "bytes": 966628
+      },
+      "veins": {
+        "url": "/models/layers/full_body/veins.glb",
+        "meshes": 230,
+        "bytes": 523584
+      },
+      "nerves": {
+        "url": "/models/layers/full_body/nerves.glb",
+        "meshes": 576,
+        "bytes": 1467944
+      },
+      "organs": {
+        "url": "/models/layers/full_body/organs.glb",
+        "meshes": 142,
+        "bytes": 492644
+      },
+      "skin": {
+        "url": "/models/layers/full_body/skin.glb",
+        "meshes": 256,
+        "bytes": 406440
+      }
+    },
+    "head_neck": {
+      "ligaments": {
+        "url": "/models/layers/head_neck/ligaments.glb",
+        "meshes": 31,
+        "bytes": 79516
+      },
+      "arteries": {
+        "url": "/models/layers/head_neck/arteries.glb",
+        "meshes": 164,
+        "bytes": 425604
+      },
+      "veins": {
+        "url": "/models/layers/head_neck/veins.glb",
+        "meshes": 59,
+        "bytes": 117148
+      },
+      "nerves": {
+        "url": "/models/layers/head_neck/nerves.glb",
+        "meshes": 344,
+        "bytes": 913112
+      },
+      "organs": {
+        "url": "/models/layers/head_neck/organs.glb",
+        "meshes": 31,
+        "bytes": 86892
+      },
+      "skin": {
+        "url": "/models/layers/head_neck/skin.glb",
+        "meshes": 103,
+        "bytes": 155440
+      }
+    },
+    "torso": {
+      "ligaments": {
+        "url": "/models/layers/torso/ligaments.glb",
+        "meshes": 80,
+        "bytes": 195184
+      },
+      "arteries": {
+        "url": "/models/layers/torso/arteries.glb",
+        "meshes": 128,
+        "bytes": 277528
+      },
+      "veins": {
+        "url": "/models/layers/torso/veins.glb",
+        "meshes": 86,
+        "bytes": 213240
+      },
+      "nerves": {
+        "url": "/models/layers/torso/nerves.glb",
+        "meshes": 66,
+        "bytes": 254992
+      },
+      "organs": {
+        "url": "/models/layers/torso/organs.glb",
+        "meshes": 111,
+        "bytes": 416332
+      },
+      "skin": {
+        "url": "/models/layers/torso/skin.glb",
+        "meshes": 35,
+        "bytes": 59344
+      }
+    },
+    "upper_limb_left": {
+      "ligaments": {
+        "url": "/models/layers/upper_limb_left/ligaments.glb",
+        "meshes": 66,
+        "bytes": 105904
+      },
+      "arteries": {
+        "url": "/models/layers/upper_limb_left/arteries.glb",
+        "meshes": 27,
+        "bytes": 60836
+      },
+      "veins": {
+        "url": "/models/layers/upper_limb_left/veins.glb",
+        "meshes": 17,
+        "bytes": 49400
+      },
+      "nerves": {
+        "url": "/models/layers/upper_limb_left/nerves.glb",
+        "meshes": 47,
+        "bytes": 96148
+      },
+      "skin": {
+        "url": "/models/layers/upper_limb_left/skin.glb",
+        "meshes": 24,
+        "bytes": 54364
+      }
+    },
+    "upper_limb_right": {
+      "ligaments": {
+        "url": "/models/layers/upper_limb_right/ligaments.glb",
+        "meshes": 66,
+        "bytes": 101648
+      },
+      "arteries": {
+        "url": "/models/layers/upper_limb_right/arteries.glb",
+        "meshes": 27,
+        "bytes": 62536
+      },
+      "veins": {
+        "url": "/models/layers/upper_limb_right/veins.glb",
+        "meshes": 18,
+        "bytes": 51732
+      },
+      "nerves": {
+        "url": "/models/layers/upper_limb_right/nerves.glb",
+        "meshes": 47,
+        "bytes": 90980
+      },
+      "skin": {
+        "url": "/models/layers/upper_limb_right/skin.glb",
+        "meshes": 24,
+        "bytes": 53280
+      }
+    },
+    "lower_limb_left": {
+      "ligaments": {
+        "url": "/models/layers/lower_limb_left/ligaments.glb",
+        "meshes": 83,
+        "bytes": 140788
+      },
+      "arteries": {
+        "url": "/models/layers/lower_limb_left/arteries.glb",
+        "meshes": 40,
+        "bytes": 97116
+      },
+      "veins": {
+        "url": "/models/layers/lower_limb_left/veins.glb",
+        "meshes": 25,
+        "bytes": 73136
+      },
+      "nerves": {
+        "url": "/models/layers/lower_limb_left/nerves.glb",
+        "meshes": 36,
+        "bytes": 85736
+      },
+      "skin": {
+        "url": "/models/layers/lower_limb_left/skin.glb",
+        "meshes": 35,
+        "bytes": 70620
+      }
+    },
+    "lower_limb_right": {
+      "ligaments": {
+        "url": "/models/layers/lower_limb_right/ligaments.glb",
+        "meshes": 83,
+        "bytes": 136012
+      },
+      "arteries": {
+        "url": "/models/layers/lower_limb_right/arteries.glb",
+        "meshes": 40,
+        "bytes": 99588
+      },
+      "veins": {
+        "url": "/models/layers/lower_limb_right/veins.glb",
+        "meshes": 25,
+        "bytes": 74740
+      },
+      "nerves": {
+        "url": "/models/layers/lower_limb_right/nerves.glb",
+        "meshes": 36,
+        "bytes": 82376
+      },
+      "skin": {
+        "url": "/models/layers/lower_limb_right/skin.glb",
+        "meshes": 35,
+        "bytes": 69004
+      }
+    }
+  }
+}
