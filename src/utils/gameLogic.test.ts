@@ -1448,4 +1448,28 @@ test('Phase 11 (v6): Balanced 111 clinical cases, fizjoterapeuty.pl clinical rec
 
   const netlifyToml = fs.readFileSync(path.resolve(process.cwd(), 'netlify.toml'), 'utf8');
   assert.ok(netlifyToml.includes('npm run build:static') && netlifyToml.includes('publish = "dist"'));
+
+  // 6. Verify Android/iOS PWA installability PNG icons (192x192, 512x512, maskable, 180x180 apple-touch-icon)
+  const manifestJson = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), 'public/manifest.webmanifest'), 'utf8'),
+  ) as { id?: string; scope?: string; icons: Array<{ src: string; sizes: string; type: string; purpose?: string }> };
+  assert.equal(manifestJson.id, '/');
+  assert.equal(manifestJson.scope, '/');
+  assert.ok(manifestJson.icons.some((i) => i.type === 'image/png' && i.sizes === '192x192'));
+  assert.ok(manifestJson.icons.some((i) => i.type === 'image/png' && i.sizes === '512x512' && i.purpose === 'any'));
+  assert.ok(manifestJson.icons.some((i) => i.type === 'image/png' && i.sizes === '512x512' && i.purpose === 'maskable'));
+  for (const iconRel of [
+    'public/icons/icon-192.png',
+    'public/icons/icon-512.png',
+    'public/icons/icon-512-maskable.png',
+    'public/icons/apple-touch-icon.png',
+  ]) {
+    const buf = fs.readFileSync(path.resolve(process.cwd(), iconRel));
+    assert.equal(buf[0], 0x89, `${iconRel} must have PNG signature`);
+    assert.equal(buf[1], 0x50, `${iconRel} must have PNG signature`);
+    assert.equal(buf[2], 0x4e, `${iconRel} must have PNG signature`);
+    assert.equal(buf[3], 0x47, `${iconRel} must have PNG signature`);
+  }
+  const indexHtml = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('rel="apple-touch-icon"') && indexHtml.includes('/icons/apple-touch-icon.png'));
 });

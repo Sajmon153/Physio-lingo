@@ -161,7 +161,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border-2 border-emerald-500 bg-emerald-50 px-2 py-1.5 text-xs font-extrabold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-950/70 dark:text-emerald-200"
             >
               <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className={isCompactPhone ? 'hidden' : 'hidden md:inline'}>Zainstaluj</span>
+              <span>Zainstaluj</span>
             </button>
           )}
 

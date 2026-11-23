@@ -18,6 +18,10 @@ const CORE_PRECACHE_URLS = [
   '/',
   '/manifest.webmanifest',
   '/favicon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/icon-512-maskable.png',
+  '/icons/apple-touch-icon.png',
   '/models/layers/manifest.json',
   '/draco/draco_decoder.js',
   '/draco/draco_decoder.wasm',
@@ -153,9 +157,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Static built assets (/assets/*, favicon, manifest) -> STALE_WHILE_REVALIDATE
+  // 3. Static built assets (/assets/*, /icons/*, favicon, manifest) -> STALE_WHILE_REVALIDATE
   if (
     url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/icons/') ||
     url.pathname === '/favicon.svg' ||
     url.pathname === '/manifest.webmanifest'
   ) {

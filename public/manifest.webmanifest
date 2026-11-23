@@ -1,19 +1,40 @@
 {
+  "id": "/",
   "name": "PhysioLingo — Anatomia Funkcjonalna i Kliniczna 3D",
   "short_name": "PhysioLingo",
   "description": "Grywalizowana aplikacja 3D dla studentów fizjoterapii do nauki anatomii funkcjonalnej, klinicznej i kinezyterapii.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f4faf6",
   "theme_color": "#10b981",
   "orientation": "any",
   "lang": "pl",
+  "categories": ["education", "medical"],
   "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

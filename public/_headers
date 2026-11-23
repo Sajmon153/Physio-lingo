@@ -10,10 +10,14 @@
   Cache-Control: no-cache, no-store, must-revalidate
   Service-Worker-Allowed: /
 
-# Web App Manifest
+# Web App Manifest (revalidate immediately so mobile browsers pick up icon/PWA updates)
 /manifest.webmanifest
   Content-Type: application/manifest+json; charset=utf-8
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
+
+# PWA PNG Icons
+/icons/*
+  Cache-Control: public, max-age=31536000, immutable
 
 # Hashed Vite assets, 45 3D .glb models, and Draco decoders — long-lived CDN caching
 /assets/*
