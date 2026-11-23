@@ -1,25 +1,25 @@
 # Dependencies & build output
-node_modules/
-build/
-dist/
-coverage/
-server.js
-.cloudflare/
-.wrangler/
+/node_modules/
+/build/
+/dist/
+/coverage/
+/server.js
+/.cloudflare/
+/.wrangler/
 .dev.vars*
 
-# Local user database & secrets
-data/
+# Local user database & secrets (anchored to repo root so src/data/ is tracked!)
+/data/
 .env*
 !.env.example
 
 # Large local archives & copyrighted reference materials (exceeds GitHub 100 MB limit)
-Fizjolingo.zip
-public/assets/aistudio/
+/Fizjolingo.zip
+/public/assets/aistudio/
 *.pdf
 
 # Internal editor / AI tool metadata
-.aistudio/
-.agents/
+/.aistudio/
+/.agents/
 .DS_Store
 *.log
