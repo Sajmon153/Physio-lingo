@@ -4,6 +4,9 @@ build/
 dist/
 coverage/
 server.js
+.cloudflare/
+.wrangler/
+.dev.vars*
 
 # Local user database & secrets
 data/

@@ -1,11 +1,24 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'exclude-unused-aistudio-pdf',
+        closeBundle() {
+          const unusedPdfDir = path.resolve(import.meta.dirname, 'dist/assets/aistudio');
+          if (fs.existsSync(unusedPdfDir)) {
+            fs.rmSync(unusedPdfDir, { recursive: true, force: true });
+          }
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),
