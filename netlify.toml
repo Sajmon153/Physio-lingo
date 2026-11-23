@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build:static"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  VITE_STATIC_HOST = "true"
+
+# SPA fallback for client-side navigation (real files like /models/*, /sw.js, /assets/* take priority)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -12,20 +12,38 @@ import type {
 import { LocalBrowserAuthAdapter } from './localAuthAdapter';
 import { BackendUnavailableError, RemoteApiAuthAdapter } from './remoteAuthAdapter';
 
+function isStaticHostBuild(): boolean {
+  try {
+    return (
+      typeof import.meta !== 'undefined' &&
+      (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_STATIC_HOST === 'true'
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Hybrid Auth & Progress Store:
  * 1. Primary: Express REST API (/api/auth/*, /api/progress) backed by ServerUserRepository
  * 2. Automatic graceful fallback: LocalBrowserAuthAdapter (Web Crypto PBKDF2 + isolated localStorage)
- *    whenever the API server is unavailable (static build, offline PWA).
+ *    whenever the API server is unavailable or when built for static CDN hosting (VITE_STATIC_HOST=true).
  */
 export class HybridAuthService implements UserAccountStoreAdapter {
   private readonly remote: RemoteApiAuthAdapter;
   private readonly local: LocalBrowserAuthAdapter;
-  private activeBackend: AuthBackendKind = 'server';
+  private readonly staticHostOnly: boolean;
+  private activeBackend: AuthBackendKind;
 
-  constructor(remote?: RemoteApiAuthAdapter, local?: LocalBrowserAuthAdapter) {
+  constructor(
+    remote?: RemoteApiAuthAdapter,
+    local?: LocalBrowserAuthAdapter,
+    staticHostOnly: boolean = isStaticHostBuild(),
+  ) {
     this.remote = remote ?? new RemoteApiAuthAdapter('/api');
     this.local = local ?? new LocalBrowserAuthAdapter();
+    this.staticHostOnly = staticHostOnly;
+    this.activeBackend = staticHostOnly ? 'local' : 'server';
   }
 
   get backendKind(): AuthBackendKind {
@@ -33,6 +51,10 @@ export class HybridAuthService implements UserAccountStoreAdapter {
   }
 
   async getCurrentSession(): Promise<AuthSessionPayload> {
+    if (this.staticHostOnly) {
+      this.activeBackend = 'local';
+      return this.local.getCurrentSession();
+    }
     try {
       const serverSession = await this.remote.getCurrentSession();
       this.activeBackend = 'server';
@@ -56,6 +78,10 @@ export class HybridAuthService implements UserAccountStoreAdapter {
   }
 
   async register(input: RegisterAccountInput): Promise<AuthSuccessPayload> {
+    if (this.staticHostOnly) {
+      this.activeBackend = 'local';
+      return this.local.register(input);
+    }
     try {
       const res = await this.remote.register(input);
       this.activeBackend = 'server';
@@ -70,6 +96,10 @@ export class HybridAuthService implements UserAccountStoreAdapter {
   }
 
   async login(input: LoginAccountInput): Promise<AuthSuccessPayload> {
+    if (this.staticHostOnly) {
+      this.activeBackend = 'local';
+      return this.local.login(input);
+    }
     try {
       const res = await this.remote.login(input);
       this.activeBackend = 'server';

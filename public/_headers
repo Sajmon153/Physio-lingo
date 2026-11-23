@@ -1,0 +1,26 @@
+# HTTP Headers for Cloudflare Pages & Netlify (copied to dist/_headers by Vite)
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Service Worker must always revalidate so clients pick up PWA updates immediately
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /
+
+# Web App Manifest
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+# Hashed Vite assets, 45 3D .glb models, and Draco decoders — long-lived CDN caching
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/models/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/draco/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1429,4 +1429,23 @@ test('Phase 11 (v6): Balanced 111 clinical cases, fizjoterapeuty.pl clinical rec
   assert.equal(formatBytesPl(2048), '2 KB');
   assert.equal(formatBytesPl(2_553_148), '2,4 MB');
   assert.equal(formatBytesPl(TOTAL_OFFLINE_3D_BYTES), '22,8 MB');
+
+  // 5. Verify GitHub Actions CI + Cloudflare Pages / Netlify static PWA deployment config
+  for (const rel of ['.github/workflows/ci.yml', 'public/_headers', 'netlify.toml', '.nvmrc']) {
+    const abs = path.resolve(process.cwd(), rel);
+    assert.equal(fs.existsSync(abs), true, `Missing CI/deploy file: ${rel}`);
+  }
+  const ciYaml = fs.readFileSync(path.resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+  assert.ok(ciYaml.includes('npm run lint'));
+  assert.ok(ciYaml.includes('npm test'));
+  assert.ok(ciYaml.includes('npm run test:e2e'));
+  assert.ok(ciYaml.includes('npm run build:static'));
+
+  const headersTxt = fs.readFileSync(path.resolve(process.cwd(), 'public/_headers'), 'utf8');
+  assert.ok(headersTxt.includes('/sw.js') && headersTxt.includes('no-cache'));
+  assert.ok(headersTxt.includes('/models/*') && headersTxt.includes('immutable'));
+  assert.ok(headersTxt.includes('/draco/*') && headersTxt.includes('immutable'));
+
+  const netlifyToml = fs.readFileSync(path.resolve(process.cwd(), 'netlify.toml'), 'utf8');
+  assert.ok(netlifyToml.includes('npm run build:static') && netlifyToml.includes('publish = "dist"'));
 });

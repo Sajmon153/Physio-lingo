@@ -3,12 +3,16 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite --port=3000 --host=0.0.0.0",
     "dev:api": "tsx server/index.ts",
     "start": "NODE_ENV=production tsx server/index.ts",
     "build": "vite build",
+    "build:static": "VITE_STATIC_HOST=true vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",

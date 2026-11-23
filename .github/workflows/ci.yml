@@ -1,0 +1,59 @@
+name: PhysioLingo CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, Testy (21 + 163 E2E) & Build PWA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Pobierz kod repozytorium
+        uses: actions/checkout@v4
+
+      - name: Skonfiguruj Node.js (z .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Zainstaluj zależności (npm ci)
+        run: npm ci
+
+      - name: Kontrola typów TypeScript (lint)
+        run: npm run lint
+
+      - name: Testy jednostkowe i API kont (npm test)
+        run: npm test
+
+      - name: Zestaw 163 testów E2E (npm run test:e2e)
+        run: npm run test:e2e
+
+      - name: Produkcyjny build statyczny PWA (npm run build:static)
+        run: npm run build:static
+
+      - name: Weryfikacja zasobów PWA i 3D w dist/
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/manifest.webmanifest
+          test -f dist/_headers
+          test -f dist/models/body.glb
+          test -f dist/models/layers/manifest.json
+          test -f dist/draco/draco_decoder.wasm
+          GLB_COUNT=$(find dist/models -type f -name '*.glb' | wc -l)
+          echo "Zweryfikowano $GLB_COUNT modeli 3D .glb w dist/models/"
+          test "$GLB_COUNT" -eq 45

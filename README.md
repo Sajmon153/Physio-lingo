@@ -1,5 +1,7 @@
 # PhysioLingo — Anatomia Funkcjonalna i Kliniczna 3D (PWA)
 
+[![PhysioLingo CI](https://github.com/Sajmon153/Physio-lingo/actions/workflows/ci.yml/badge.svg)](https://github.com/Sajmon153/Physio-lingo/actions/workflows/ci.yml)
+
 Interaktywna, grywalizowana aplikacja edukacyjna 3D dla studentów fizjoterapii do nauki anatomii funkcjonalnej, klinicznej, biomechaniki, kinezyterapii oraz diagnostyki różnicowej — w 100% po polsku, w pełni zgodna ze standardami egzaminacyjnymi (`ISOM` / `SFTR` / `Lovett 0–5` / `fizjoterapeuty.pl`) i przystosowana do pracy **offline (PWA)**.
 
 ---
@@ -44,12 +46,27 @@ Aplikacja uruchomi się pod adresem `http://localhost:3000/`.
 ```bash
 npm run dev:web     # Sam frontend Vite (z lokalnym fallbackiem kont w przeglądarce)
 npm run dev:api     # Sam serwer API Express (:3001)
-npm run build       # Build produkcyjny (dist/)
-npm start           # Serwer produkcyjny (serwuje dist/ + API)
-npm run lint        # Kontrola typów TypeScript (tsc --noEmit)
-npm test            # Testy jednostkowe i API (21/21)
-npm run test:e2e    # Zestaw 163 testów E2E
+npm run build         # Build produkcyjny (dist/)
+npm run build:static  # Build PWA pod hosting statyczny (Cloudflare Pages / Netlify — bez wywołań /api)
+npm start             # Serwer produkcyjny (serwuje dist/ + API)
+npm run lint          # Kontrola typów TypeScript (tsc --noEmit)
+npm test              # Testy jednostkowe i API (21/21)
+npm run test:e2e      # Zestaw 163 testów E2E
 ```
+
+---
+
+## Publikacja online (HTTPS PWA) i CI/CD
+
+Repozytorium jest gotowe do automatycznej publikacji na **Cloudflare Pages** oraz **Netlify** (wraz z nagłówkami cache PWA/3D w `public/_headers` oraz CI w `.github/workflows/ci.yml`):
+
+- **Cloudflare Pages** (*Workers & Pages → Create → Pages → Connect to Git → `Sajmon153/Physio-lingo`*):
+  - **Build command:** `npm run build:static`
+  - **Build output directory:** `dist`
+  - **Node.js:** automatycznie `22` (z `.nvmrc`)
+- **Netlify** (*Add new site → Import from Git → `Sajmon153/Physio-lingo`*):
+  - Zero ręcznej konfiguracji — `netlify.toml` automatycznie uruchamia `npm run build:static`, publikuje `dist/`, ustawia Node `22` i przekierowanie SPA.
+- **GitHub Actions CI (`.github/workflows/ci.yml`)**: przy każdym `push` na `main` i Pull Requeście uruchamia pełny pipeline (`lint` → `npm test` → `npm run test:e2e` → `npm run build:static` → kontrola 45 modeli `.glb` i zasobów PWA).
 
 ---
 
