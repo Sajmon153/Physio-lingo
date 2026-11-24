@@ -66,6 +66,25 @@
     padding-top: env(safe-area-inset-top);
   }
 
+  :root {
+    --zigzag-scale: 0.36;
+  }
+
+  @media (min-width: 480px) {
+    :root {
+      --zigzag-scale: 1;
+    }
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
   }

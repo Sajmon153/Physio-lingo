@@ -94,6 +94,7 @@ import {
   TOTAL_OFFLINE_3D_FILES,
   formatBytesPl,
 } from '../services/pwaOfflineService.ts';
+import { computeClickOrbitGoal } from '../three/cameraFocus.ts';
 
 test('anatomical database covers both required regions in 100% Polish without Latin fields', () => {
   const shoulder = ANATOMY_DB.filter((s) => s.region === 'shoulder');
@@ -1472,4 +1473,49 @@ test('Phase 11 (v6): Balanced 111 clinical cases, fizjoterapeuty.pl clinical rec
   }
   const indexHtml = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
   assert.ok(indexHtml.includes('rel="apple-touch-icon"') && indexHtml.includes('/icons/apple-touch-icon.png'));
+
+  // 7. Verify 3D click-to-pivot camera orbit targeting math (small structure center vs sprawling mesh hit point)
+  const clavicleGoal = computeClickOrbitGoal({
+    currentPos: { x: 0, y: 0.2, z: 3.5 },
+    currentTarget: { x: 0, y: 0.05, z: 0 },
+    structureCenter: { x: -0.22, y: 1.42, z: 0.08 },
+    structureRadius: 0.11,
+    hitPoint: { x: -0.19, y: 1.4, z: 0.1 },
+    minDistance: 0.06,
+    maxDistance: 18,
+    fovDeg: 42,
+    aspect: 0.85,
+  });
+  assert.equal(clavicleGoal.usedHitPoint, false);
+  assert.deepEqual(clavicleGoal.target, { x: -0.22, y: 1.42, z: 0.08 });
+  assert.ok(clavicleGoal.distance < 3.5 && clavicleGoal.distance >= 0.85, `Expected gentle zoom-in from full body, got ${clavicleGoal.distance}`);
+
+  // When already zoomed in close, clicking an adjacent structure preserves close zoom without jumping back
+  const closeGoal = computeClickOrbitGoal({
+    currentPos: { x: 0, y: 1.42, z: 0.58 },
+    currentTarget: { x: 0, y: 1.42, z: 0.08 },
+    structureCenter: { x: -0.18, y: 1.42, z: 0.08 },
+    structureRadius: 0.09,
+    hitPoint: { x: -0.16, y: 1.42, z: 0.11 },
+    minDistance: 0.06,
+    maxDistance: 18,
+    fovDeg: 42,
+    aspect: 0.85,
+  });
+  assert.ok(Math.abs(closeGoal.distance - 0.5) < 0.01, `Expected preserved close distance 0.5, got ${closeGoal.distance}`);
+
+  // For sprawling full-body mesh (radius >= 0.38), orbit target snaps to exact clicked hitPoint
+  const sprawlingGoal = computeClickOrbitGoal({
+    currentPos: { x: 0, y: 0.5, z: 2.5 },
+    currentTarget: { x: 0, y: 0.5, z: 0 },
+    structureCenter: { x: 0, y: 0, z: 0 },
+    structureRadius: 0.95,
+    hitPoint: { x: 0.25, y: 1.15, z: 0.12 },
+    minDistance: 0.06,
+    maxDistance: 18,
+    fovDeg: 42,
+    aspect: 1.0,
+  });
+  assert.equal(sprawlingGoal.usedHitPoint, true);
+  assert.deepEqual(sprawlingGoal.target, { x: 0.25, y: 1.15, z: 0.12 });
 });

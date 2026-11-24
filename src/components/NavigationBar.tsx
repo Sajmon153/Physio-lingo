@@ -156,14 +156,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = React.memo(({
               type="button"
               data-testid={`mobile-nav-${item.id}`}
               onClick={() => onChangeView(item.id)}
-              className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[11px] font-bold transition ${
+              className={`flex min-h-[46px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] font-extrabold transition sm:text-[11px] ${
                 isActive
-                  ? 'bg-emerald-50/70 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400'
+                  ? 'bg-emerald-50/90 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                   : 'text-[#52695b] hover:text-emerald-950 dark:text-[#94b0a0] dark:hover:text-emerald-50'
               }`}
             >
-              <Icon className="h-5 w-5" />
-              <span className="whitespace-nowrap">{item.shortLabel}</span>
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="max-w-full truncate">{item.shortLabel}</span>
             </button>
           );
         })}

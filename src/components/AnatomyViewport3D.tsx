@@ -6,6 +6,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
   AlertTriangle,
+  Crosshair,
   Eye,
   EyeOff,
   FlipHorizontal2,
@@ -13,6 +14,8 @@ import {
   MapPin,
   Maximize2,
   Minimize2,
+  Move,
+  Rotate3d,
   RotateCcw,
   ScanEye,
   Scissors,
@@ -40,6 +43,7 @@ import {
 } from '../three/proceduralModels';
 export type { SelectableMeshMeta };
 import { formatBilingualName, translateMeshNameToPolish } from '../three/anatomyTranslator';
+import { computeClickOrbitGoal } from '../three/cameraFocus';
 import {
   ANATOMY_LAYERS_META,
   classifyBaseGlbMeshLayer,
@@ -469,6 +473,7 @@ export const AnatomyViewport3D = React.forwardRef<
     skinOpacityRef.current = skinOpacity;
     const [showLayersPanel, setShowLayersPanel] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [touchNavMode, setTouchNavMode] = useState<'rotate' | 'pan'>('rotate');
     const [layerMeshCounts, setLayerMeshCounts] = useState<Partial<Record<AnatomicalLayerId, number>>>({});
     const [loadingOverlayLayers, setLoadingOverlayLayers] = useState(false);
     const [hiddenPartIds, setHiddenPartIds] = useState<string[]>([]);
@@ -524,6 +529,8 @@ export const AnatomyViewport3D = React.forwardRef<
       focusBodyZone: (zone: BodyFocusZone) => void;
       setCameraPreset: (preset: CameraViewPreset) => void;
       focusMesh: (partId: string) => void;
+      pivotOnPoint: (worldPos: THREE.Vector3, radius?: number) => void;
+      pivotOnPart: (partId: string, fallbackHitPoint: THREE.Vector3) => void;
       focusHotspot?: (hotspot: BonyLandmarkHotspot, orientToNormal?: boolean) => void;
       selectLandmark?: (landmarkId: string) => void;
       loadProcedural: (targetRegion: RegionId, notice?: string | null) => void;
@@ -561,6 +568,8 @@ export const AnatomyViewport3D = React.forwardRef<
       focusBodyZone: () => {},
       setCameraPreset: () => {},
       focusMesh: () => {},
+      pivotOnPoint: () => {},
+      pivotOnPart: () => {},
       loadProcedural: () => {},
       loadGlbFromUrl: () => {},
       loadCustomGlb: () => {},
@@ -1687,6 +1696,7 @@ export const AnatomyViewport3D = React.forwardRef<
     camera.position.set(2.1, 0.75, 3.8);
 
     const controls = new OrbitControls(camera, renderer.domElement);
+    renderer.domElement.style.touchAction = 'none';
     controls.enableDamping = !isSoftwareGl;
     controls.dampingFactor = 0.12;
     controls.enablePan = true;
@@ -1694,9 +1704,13 @@ export const AnatomyViewport3D = React.forwardRef<
     controls.zoomToCursor = true;
     controls.zoomSpeed = 1.65;
     controls.rotateSpeed = 0.85;
-    controls.panSpeed = 0.9;
+    controls.panSpeed = 0.95;
     controls.minDistance = 0.06;
     controls.maxDistance = 18;
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN,
+    };
     controls.target.set(0, 0.05, 0);
     controls.update();
 
@@ -2226,6 +2240,66 @@ export const AnatomyViewport3D = React.forwardRef<
       dir.normalize();
 
       animateCameraTo(center, center.clone().add(dir.multiplyScalar(dist)));
+    };
+
+    refs.pivotOnPoint = (worldPos: THREE.Vector3, radius = 0.08) => {
+      const currentTarget = cameraAnimGoal ? cameraAnimGoal.target : controls.target;
+      const currentPos = cameraAnimGoal ? cameraAnimGoal.position : camera.position;
+      const goal = computeClickOrbitGoal({
+        currentPos,
+        currentTarget,
+        structureCenter: worldPos,
+        structureRadius: radius,
+        hitPoint: worldPos,
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
+        fovDeg: camera.fov,
+        aspect: camera.aspect,
+      });
+      animateCameraTo(
+        new THREE.Vector3(goal.target.x, goal.target.y, goal.target.z),
+        new THREE.Vector3(goal.position.x, goal.position.y, goal.position.z),
+      );
+    };
+
+    refs.pivotOnPart = (partId: string, fallbackHitPoint: THREE.Vector3) => {
+      const mapped = refs.partMeshes.get(partId);
+      const targetMeshes = (
+        mapped && mapped.length > 0
+          ? mapped
+          : refs.interactables.filter(
+              (m) => m.userData.id === partId || m.userData.structureId === partId,
+            )
+      ).filter((m) => m.visible);
+
+      const box = new THREE.Box3();
+      for (const m of targetMeshes) {
+        m.updateWorldMatrix(true, false);
+        box.expandByObject(m);
+      }
+
+      const center = box.isEmpty()
+        ? fallbackHitPoint.clone()
+        : box.getCenter(new THREE.Vector3());
+      const radius = box.isEmpty() ? 0.1 : box.getSize(new THREE.Vector3()).length() * 0.5;
+
+      const currentTarget = cameraAnimGoal ? cameraAnimGoal.target : controls.target;
+      const currentPos = cameraAnimGoal ? cameraAnimGoal.position : camera.position;
+      const goal = computeClickOrbitGoal({
+        currentPos,
+        currentTarget,
+        structureCenter: center,
+        structureRadius: radius,
+        hitPoint: fallbackHitPoint,
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
+        fovDeg: camera.fov,
+        aspect: camera.aspect,
+      });
+      animateCameraTo(
+        new THREE.Vector3(goal.target.x, goal.target.y, goal.target.z),
+        new THREE.Vector3(goal.position.x, goal.position.y, goal.position.z),
+      );
     };
 
     refs.focusHotspot = (hotspot: BonyLandmarkHotspot, orientToNormal = false) => {
@@ -2944,6 +3018,8 @@ export const AnatomyViewport3D = React.forwardRef<
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
+    const activePointerIds = new Set<number>();
+    let hadMultiTouch = false;
     let pointerDownX = 0;
     let pointerDownY = 0;
     let pointerDownActive = false;
@@ -2957,10 +3033,24 @@ export const AnatomyViewport3D = React.forwardRef<
     };
 
     const handlePointerDown = (ev: PointerEvent) => {
-      if (ev.button !== 0) return;
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      activePointerIds.add(ev.pointerId);
+      if (activePointerIds.size > 1) {
+        hadMultiTouch = true;
+        pointerDownActive = false;
+        return;
+      }
       pointerDownActive = true;
       pointerDownX = ev.clientX;
       pointerDownY = ev.clientY;
+    };
+
+    const handlePointerCancel = (ev: PointerEvent) => {
+      activePointerIds.delete(ev.pointerId);
+      pointerDownActive = false;
+      if (activePointerIds.size === 0) {
+        hadMultiTouch = false;
+      }
     };
 
     const getVisibleInteractables = () => refs.interactables.filter((m) => m.visible);
@@ -2992,10 +3082,19 @@ export const AnatomyViewport3D = React.forwardRef<
     };
 
     const handlePointerUp = (ev: PointerEvent) => {
-      if (!pointerDownActive) return;
+      activePointerIds.delete(ev.pointerId);
+      const wasMultiTouch = hadMultiTouch;
+      if (activePointerIds.size === 0) {
+        hadMultiTouch = false;
+      }
+      if (!pointerDownActive || wasMultiTouch) {
+        pointerDownActive = false;
+        return;
+      }
       pointerDownActive = false;
       const dist = Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY);
-      if (dist > 6) return;
+      const maxTapDrag = ev.pointerType === 'touch' ? 12 : 6;
+      if (dist > maxTapDrag) return;
 
       updatePointer(ev);
       raycaster.setFromCamera(pointer, camera);
@@ -3009,6 +3108,8 @@ export const AnatomyViewport3D = React.forwardRef<
         if (hitZone) {
           setSelectedHotspot(hitZone);
           setShowHiddenPanel(false);
+          const zonePos = getBoneZoneWorldPosition(refs.interactables, hitZone.id);
+          refs.pivotOnPoint(zonePos?.worldPos ?? primaryHit.point, 0.08);
           const resolvedId = hitZone.structureId || hitZone.id;
           onSelectPartRef.current({
             id: hitZone.id,
@@ -3024,7 +3125,7 @@ export const AnatomyViewport3D = React.forwardRef<
           return;
         }
 
-        // Priority 2: Whole structure mesh selection
+        // Priority 2: Whole structure mesh selection — smoothly align orbit axis onto clicked structure
         const hitObj = primaryHit.object;
         const {
           id,
@@ -3038,6 +3139,11 @@ export const AnatomyViewport3D = React.forwardRef<
           layerId,
         } = hitObj.userData;
         setSelectedHotspot(null);
+        if (id) {
+          refs.pivotOnPart(id, primaryHit.point);
+        } else {
+          refs.pivotOnPoint(primaryHit.point, 0.12);
+        }
         onSelectPartRef.current({
           id,
           rawMeshName: rawName || hitObj.name,
@@ -3083,6 +3189,7 @@ export const AnatomyViewport3D = React.forwardRef<
     };
 
     const handlePointerMove = (ev: PointerEvent) => {
+      if (ev.pointerType === 'touch') return;
       const now = performance.now();
       if (now - lastHoverCheck < 50) return;
       lastHoverCheck = now;
@@ -3165,6 +3272,7 @@ export const AnatomyViewport3D = React.forwardRef<
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
     renderer.domElement.addEventListener('pointerup', handlePointerUp);
+    renderer.domElement.addEventListener('pointercancel', handlePointerCancel);
     renderer.domElement.addEventListener('pointermove', handlePointerMove);
     renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
     renderer.domElement.addEventListener('dblclick', handleDoubleClick);
@@ -3203,6 +3311,7 @@ export const AnatomyViewport3D = React.forwardRef<
       dracoLoader.dispose();
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer.domElement.removeEventListener('pointerup', handlePointerUp);
+      renderer.domElement.removeEventListener('pointercancel', handlePointerCancel);
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
       renderer.domElement.removeEventListener('dblclick', handleDoubleClick);
@@ -3233,6 +3342,34 @@ export const AnatomyViewport3D = React.forwardRef<
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync 1-finger touch / left-mouse OrbitControls mode (Rotate vs Pan) for ergonomic phone navigation
+  useEffect(() => {
+    const controls = sceneRefs.current.controls;
+    if (!controls) return;
+    if (touchNavMode === 'pan') {
+      controls.touches = {
+        ONE: THREE.TOUCH.PAN,
+        TWO: THREE.TOUCH.DOLLY_PAN,
+      };
+      controls.mouseButtons = {
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      };
+    } else {
+      controls.touches = {
+        ONE: THREE.TOUCH.ROTATE,
+        TWO: THREE.TOUCH.DOLLY_PAN,
+      };
+      controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+    }
+    controls.update();
+  }, [touchNavMode]);
 
   // Load regional GLB or full_body on initial mount and whenever region/modelUrl/highlightedStructureId changes
   useEffect(() => {
@@ -3301,9 +3438,9 @@ export const AnatomyViewport3D = React.forwardRef<
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex w-full flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0">
           {!customModelName && (
-            <div className="flex items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]">
+            <div className="flex shrink-0 items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]">
               {(
                 [
                   { id: 'all', label: 'Wszystko' },
@@ -3397,7 +3534,7 @@ export const AnatomyViewport3D = React.forwardRef<
           {!customModelName && canToggleMuscleGrouping && (
             <div
               data-testid="muscle-grouping-toggle"
-              className="flex items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]"
+              className="flex shrink-0 items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]"
             >
               {(
                 [
@@ -3428,7 +3565,7 @@ export const AnatomyViewport3D = React.forwardRef<
           )}
 
           {region === 'full_body' && !customModelName && (
-            <div className="flex flex-wrap items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]">
+            <div className="flex shrink-0 items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]">
               <button
                 type="button"
                 onClick={() => sceneRefs.current.focusBodyZone('full')}
@@ -3517,7 +3654,7 @@ export const AnatomyViewport3D = React.forwardRef<
 
           <div
             data-testid="toggle-bony-landmarks-btn"
-            className="flex flex-wrap items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]"
+            className="flex shrink-0 items-center rounded-xl border border-[#c2d8ca] bg-white p-0.5 dark:border-[#294737] dark:bg-[#182b21]"
           >
             {(
               [
@@ -3653,7 +3790,7 @@ export const AnatomyViewport3D = React.forwardRef<
           </div>
         )}
 
-        {/* Discreet Floating Zoom Controls (+ / −) */}
+        {/* Floating Mobile-Ergonomic 3D Navigation Controls (+ / − / Rotate↔Pan / Recenter) */}
         <div
           data-testid="viewport-zoom-controls"
           className="absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden rounded-xl border border-emerald-500/35 bg-[#0a1410]/85 shadow-lg backdrop-blur-md"
@@ -3664,7 +3801,7 @@ export const AnatomyViewport3D = React.forwardRef<
             onClick={() => sceneRefs.current.zoomBy(0.72)}
             title="Przybliż widok (lub użyj rolki myszy / gestu szczypania)"
             aria-label="Przybliż model 3D"
-            className="flex h-9 w-9 items-center justify-center text-emerald-100 transition hover:bg-emerald-600/40 active:bg-emerald-600/60"
+            className="flex h-10 w-10 items-center justify-center text-emerald-100 transition hover:bg-emerald-600/40 active:bg-emerald-600/60 sm:h-9 sm:w-9"
           >
             <ZoomIn className="h-4 w-4" />
           </button>
@@ -3675,11 +3812,72 @@ export const AnatomyViewport3D = React.forwardRef<
             onClick={() => sceneRefs.current.zoomBy(1.38)}
             title="Oddal widok (lub użyj rolki myszy / gestu szczypania)"
             aria-label="Oddal model 3D"
-            className="flex h-9 w-9 items-center justify-center text-emerald-100 transition hover:bg-emerald-600/40 active:bg-emerald-600/60"
+            className="flex h-10 w-10 items-center justify-center text-emerald-100 transition hover:bg-emerald-600/40 active:bg-emerald-600/60 sm:h-9 sm:w-9"
           >
             <ZoomOut className="h-4 w-4" />
           </button>
+          <div className="h-px bg-emerald-500/25" />
+          <button
+            type="button"
+            data-testid="viewport-touch-mode-toggle"
+            onClick={() => setTouchNavMode((prev) => (prev === 'rotate' ? 'pan' : 'rotate'))}
+            title={
+              touchNavMode === 'pan'
+                ? 'Tryb przesuwania (1 palec przesuwa model). Kliknij, aby wrócić do obrotu.'
+                : 'Tryb obrotu (1 palec obraca wokół klikniętej struktury). Kliknij, aby włączyć przesuwanie 1 palcem.'
+            }
+            aria-label={
+              touchNavMode === 'pan'
+                ? 'Przełącz na obrót modelu 3D'
+                : 'Przełącz na przesuwanie modelu 3D jednym palcem'
+            }
+            className={`flex h-10 w-10 items-center justify-center transition sm:h-9 sm:w-9 ${
+              touchNavMode === 'pan'
+                ? 'bg-emerald-500 text-white'
+                : 'text-emerald-100 hover:bg-emerald-600/40 active:bg-emerald-600/60'
+            }`}
+          >
+            {touchNavMode === 'pan' ? (
+              <Move className="h-4 w-4" />
+            ) : (
+              <Rotate3d className="h-4 w-4" />
+            )}
+          </button>
+          <div className="h-px bg-emerald-500/25" />
+          <button
+            type="button"
+            data-testid="viewport-recenter-btn"
+            onClick={() => {
+              if (selectedHotspot) {
+                sceneRefs.current.focusHotspot?.(selectedHotspot);
+              } else if (effectiveSelectedId) {
+                sceneRefs.current.focusMesh(effectiveSelectedId);
+              } else {
+                sceneRefs.current.resetCamera();
+              }
+            }}
+            title={
+              selectedHotspot || effectiveSelectedId
+                ? 'Zbliż i wyśrodkuj kamerę na zaznaczonej strukturze'
+                : 'Resetuj widok modelu 3D'
+            }
+            aria-label={
+              selectedHotspot || effectiveSelectedId
+                ? 'Wyśrodkuj kamerę na zaznaczonej strukturze'
+                : 'Resetuj widok modelu 3D'
+            }
+            className="flex h-10 w-10 items-center justify-center text-emerald-100 transition hover:bg-emerald-600/40 active:bg-emerald-600/60 sm:h-9 sm:w-9"
+          >
+            <Crosshair className="h-4 w-4" />
+          </button>
         </div>
+
+        {/* Subtle Touch Pan Active Hint Pill */}
+        {touchNavMode === 'pan' && (
+          <div className="pointer-events-none absolute bottom-3 left-16 z-10 rounded-xl border border-emerald-400/60 bg-[#0a1410]/85 px-2.5 py-1.5 text-[11px] font-bold text-emerald-200 shadow backdrop-blur-md">
+            Tryb przesuwania (1 palec)
+          </div>
+        )}
 
         {/* Active Dermatome / Myotome Banner */}
         {dermatomeHighlight && !dermatomeHighlight.maskedLabel && (() => {
@@ -4090,7 +4288,7 @@ export const AnatomyViewport3D = React.forwardRef<
         {showHiddenPanel && hiddenPartIds.length > 0 && (
           <div
             data-testid="hidden-parts-restore-panel"
-            className="absolute top-3 right-3 z-30 w-72 rounded-2xl border-2 border-emerald-600 bg-white/95 p-3 shadow-2xl backdrop-blur-md sm:w-80 dark:border-emerald-700 dark:bg-[#112018]/95"
+            className="absolute top-3 right-3 z-30 w-72 max-w-[calc(100%-1.5rem)] rounded-2xl border-2 border-emerald-600 bg-white/95 p-3 shadow-2xl backdrop-blur-md sm:w-80 dark:border-emerald-700 dark:bg-[#112018]/95"
           >
             <div className="flex items-center justify-between gap-2 border-b border-[#d6e7dc] pb-2 dark:border-[#233d2f]">
               <span className="text-xs font-extrabold text-[#16291f] dark:text-[#e6f2ea]">
@@ -4157,7 +4355,7 @@ export const AnatomyViewport3D = React.forwardRef<
         {!hideHotspotOverlay && selectedHotspot && (
           <div
             data-testid="hotspot-detail-card"
-            className="absolute right-3 bottom-3 z-30 max-w-sm rounded-2xl border-2 border-emerald-500 bg-white/95 p-4 shadow-2xl backdrop-blur-md dark:border-emerald-600 dark:bg-[#112018]/95"
+            className="absolute right-3 bottom-3 z-30 w-[calc(100%-1.5rem)] max-w-sm rounded-2xl border-2 border-emerald-500 bg-white/95 p-3.5 shadow-2xl backdrop-blur-md sm:w-auto sm:p-4 dark:border-emerald-600 dark:bg-[#112018]/95"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

@@ -519,6 +519,13 @@ export default function App() {
     setProgress((prev) => restoreHeartsProgress(prev, restoreAmount));
   };
 
+  const handleChangeView = useCallback((nextView: AppView) => {
+    setActiveView(nextView);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
   const isDarkMode = progress.theme === 'dark';
 
   // Full-screen focus mode while inside an active lesson or heart recovery quiz
@@ -570,8 +577,8 @@ export default function App() {
       data-device-mode={deviceMode}
       className={
         isPhoneFrame || isIpadFrame
-          ? 'min-h-screen bg-[#e5f2ea] dark:bg-[#060c09]'
-          : 'min-h-screen bg-[#f4faf6] dark:bg-[#0b1510]'
+          ? 'min-h-screen overflow-x-clip bg-[#e5f2ea] dark:bg-[#060c09]'
+          : 'min-h-screen overflow-x-clip bg-[#f4faf6] dark:bg-[#0b1510]'
       }
     >
       <div
@@ -586,7 +593,7 @@ export default function App() {
         {!isPhoneFrame && (
           <NavigationBar
             activeView={activeView}
-            onChangeView={setActiveView}
+            onChangeView={handleChangeView}
             completedCount={progress.completedLessonIds.length}
             totalLessons={totalLessons}
             deviceMode={deviceMode}
@@ -611,8 +618,8 @@ export default function App() {
           />
 
           <main
-            className={`flex-1 ${
-              isPhoneFrame ? 'px-3 py-4' : 'px-4 py-6 sm:px-6 lg:px-8'
+            className={`min-w-0 flex-1 ${
+              isPhoneFrame ? 'px-3 py-4 pb-24' : 'px-3 py-4 pb-24 sm:px-6 sm:py-6 lg:px-8 lg:pb-8'
             }`}
           >
             {activeView === 'tree' && (
@@ -713,7 +720,7 @@ export default function App() {
           {isPhoneFrame && (
             <NavigationBar
               activeView={activeView}
-              onChangeView={setActiveView}
+              onChangeView={handleChangeView}
               completedCount={progress.completedLessonIds.length}
               totalLessons={totalLessons}
               deviceMode={deviceMode}

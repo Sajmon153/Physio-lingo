@@ -719,20 +719,27 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border-2 border-[#d6e7dc] bg-white p-1.5 dark:border-[#233d2f] dark:bg-[#112018]">
+        <div className="flex w-full flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar rounded-2xl border-2 border-[#d6e7dc] bg-white p-1.5 sm:w-auto sm:flex-wrap sm:overflow-visible dark:border-[#233d2f] dark:bg-[#112018]">
           {EXPLORER_REGION_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               type="button"
               data-testid={opt.testId}
               onClick={() => handleRegionChange(opt.id)}
-              className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-extrabold transition ${
+              className={`shrink-0 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-xs font-extrabold transition sm:px-3 sm:py-2 ${
                 region === opt.id
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-[#354c3f] hover:bg-[#ebf5ee] dark:text-[#c7dbcf] dark:hover:bg-[#182b21]'
               }`}
             >
-              {opt.label}
+              {opt.id === 'full_body' ? (
+                <>
+                  <span className="sm:hidden">Całe ciało 3D</span>
+                  <span className="hidden sm:inline">{opt.label}</span>
+                </>
+              ) : (
+                opt.label
+              )}
             </button>
           ))}
         </div>
@@ -755,7 +762,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
           }`}
         >
           {/* Clinical 3D Tools Bar: Dermatomy/Miotomy (C4–S2) + Test Kliniczny 3D + Biomechanika 3D */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 sm:flex-wrap sm:overflow-visible sm:pb-0">
             <button
               type="button"
               data-testid="toggle-dermatome-panel-btn"
@@ -764,7 +771,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                 setShowClinicalTestPanel(false);
                 setShowBiomechanicsPanel(false);
               }}
-              className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
                 showDermatomePanel || dermatomeHighlight
                   ? 'border-emerald-600 bg-emerald-500 text-white'
                   : 'border-[#d6e7dc] bg-white text-[#16291f] hover:border-emerald-400 dark:border-[#233d2f] dark:bg-[#112018] dark:text-emerald-50'
@@ -786,7 +793,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                 setShowDermatomePanel(false);
                 setShowBiomechanicsPanel(false);
               }}
-              className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
                 showClinicalTestPanel || clinicalTestHighlight
                   ? 'border-emerald-600 bg-emerald-500 text-white'
                   : 'border-[#d6e7dc] bg-white text-[#16291f] hover:border-emerald-400 dark:border-[#233d2f] dark:bg-[#112018] dark:text-emerald-50'
@@ -808,7 +815,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                 setShowDermatomePanel(false);
                 setShowClinicalTestPanel(false);
               }}
-              className={`inline-flex items-center gap-1.5 rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border-2 px-3 py-1.5 text-xs font-extrabold transition ${
                 showBiomechanicsPanel || biomechanicsHighlight
                   ? 'border-emerald-600 bg-emerald-500 text-white'
                   : 'border-[#d6e7dc] bg-white text-[#16291f] hover:border-emerald-400 dark:border-[#233d2f] dark:bg-[#112018] dark:text-emerald-50'
@@ -1307,7 +1314,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
             onClearBiomechanicsHighlight={() => setBiomechanicsHighlight(null)}
             enableExtendedLayers
             hideHotspotOverlay
-            heightClassName="h-[360px] sm:h-[480px] md:h-[560px]"
+            heightClassName="h-[400px] sm:h-[480px] md:h-[560px]"
             isDarkMode={isDarkMode}
           />
         </div>

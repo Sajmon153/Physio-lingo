@@ -912,19 +912,30 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
       className="mx-auto w-full max-w-6xl space-y-4 pb-24 md:pb-10"
     >
       {/* Top Bar + 5-step Progress Stepper */}
-      <div className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-4 dark:border-[#233d2f] dark:bg-[#112018]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              data-testid="case-exit-btn"
-              onClick={exitCase}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#d6e7dc] px-2.5 py-1.5 text-xs font-extrabold text-[#354c3f] transition hover:bg-[#ebf5ee] dark:border-[#294737] dark:text-[#c7dbcf] dark:hover:bg-[#182b21]"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Katalog</span>
-            </button>
-            <div>
+      <div className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-3.5 sm:p-4 dark:border-[#233d2f] dark:bg-[#112018]">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex w-full items-center justify-between gap-2 sm:w-auto">
+              <button
+                type="button"
+                data-testid="case-exit-btn"
+                onClick={exitCase}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#d6e7dc] px-2.5 py-1.5 text-xs font-extrabold text-[#354c3f] transition hover:bg-[#ebf5ee] dark:border-[#294737] dark:text-[#c7dbcf] dark:hover:bg-[#182b21]"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Katalog</span>
+              </button>
+              <span
+                className={`rounded-xl px-2.5 py-1 text-[11px] font-extrabold sm:hidden ${
+                  mode === 'osce'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                }`}
+              >
+                {mode === 'osce' ? 'OSCE' : 'Tryb nauki'}
+              </span>
+            </div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-display text-sm font-extrabold text-emerald-950 dark:text-white sm:text-base">
                   {activeCase.titlePl}
@@ -944,7 +955,7 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
           </div>
 
           <span
-            className={`rounded-xl px-3 py-1 text-xs font-extrabold ${
+            className={`hidden shrink-0 rounded-xl px-3 py-1 text-xs font-extrabold sm:inline-flex ${
               mode === 'osce'
                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300'
                 : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
@@ -954,7 +965,7 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
           </span>
         </div>
 
-        {/* 5-step progress indicator */}
+        {/* 5-step progress indicator (compact numbered pills on mobile + full active title) */}
         <div className="mt-3 grid grid-cols-5 gap-1.5">
           {STAGE_TITLES.map((title, idx) => {
             const doneOutcome = outcomes.find((o) => o.stageIndex === idx);
@@ -979,12 +990,17 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
             return (
               <div
                 key={title}
-                className={`truncate rounded-xl border px-2 py-1.5 text-center text-[10px] font-extrabold sm:text-[11px] ${pillClass}`}
+                title={title}
+                className={`truncate rounded-xl border px-1.5 py-1.5 text-center text-[11px] font-extrabold sm:px-2 ${pillClass}`}
               >
-                {title}
+                <span className="sm:hidden">{idx + 1}</span>
+                <span className="hidden sm:inline">{title}</span>
               </div>
             );
           })}
+        </div>
+        <div className="mt-2 text-center text-xs font-extrabold text-emerald-800 sm:hidden dark:text-emerald-300">
+          Etap {stageIndex + 1}/5: {STAGE_TITLES[stageIndex]?.replace(/^\d+\.\s*/, '')}
         </div>
       </div>
 

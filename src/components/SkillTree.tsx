@@ -83,18 +83,20 @@ export const SkillTree: React.FC<SkillTreeProps> = React.memo(
                   <h3 className="font-display text-sm font-bold text-amber-900 dark:text-amber-200">
                     Struktury wymagające powtórki (kliknij, aby obejrzeć w 3D)
                   </h3>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {topMistakes.map(({ structure, wrongCount }) => (
                       <button
                         key={structure.id}
                         type="button"
                         data-testid={`mistake-chip-${structure.id}`}
                         onClick={() => onInspectStructureIn3D?.(structure)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-[#16291f] transition hover:border-emerald-500 hover:bg-emerald-50 dark:border-amber-700 dark:bg-[#112018] dark:text-emerald-50 dark:hover:border-emerald-500 dark:hover:bg-[#182b21]"
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-2.5 py-1.5 text-left text-xs font-semibold text-[#16291f] transition hover:border-emerald-500 hover:bg-emerald-50 dark:border-amber-700 dark:bg-[#112018] dark:text-emerald-50 dark:hover:border-emerald-500 dark:hover:bg-[#182b21]"
                       >
-                        <Box className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>{formatBilingualName(structure.namePl, structure.nameEn)}</span>
-                        <span className="font-mono-tabular text-amber-600 dark:text-amber-400">
+                        <Box className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span className="min-w-0 break-words">
+                          {formatBilingualName(structure.namePl, structure.nameEn)}
+                        </span>
+                        <span className="font-mono-tabular shrink-0 text-amber-600 dark:text-amber-400">
                           ({wrongCount}×)
                         </span>
                       </button>
@@ -161,7 +163,7 @@ export const SkillTree: React.FC<SkillTreeProps> = React.memo(
               </div>
 
               {/* Vertical Winding Node Path */}
-              <div className="relative flex flex-col items-center gap-8 py-2">
+              <div className="relative flex flex-col items-center gap-7 overflow-x-clip py-2 sm:gap-8">
                 {section.lessons.map((lesson, idx) => {
                   const status = statuses[lesson.id] ?? 'locked';
                   const bestAccuracy = progress.lessonBestAccuracy[lesson.id];
@@ -176,8 +178,10 @@ export const SkillTree: React.FC<SkillTreeProps> = React.memo(
                   return (
                     <div
                       key={lesson.id}
-                      className="relative flex flex-col items-center"
-                      style={{ transform: `translateX(${offsetX}px)` }}
+                      className="relative flex max-w-full flex-col items-center"
+                      style={{
+                        transform: `translateX(calc(${offsetX}px * var(--zigzag-scale, 1)))`,
+                      }}
                     >
                       {showStartPill && (
                         <div className="mb-2.5 rounded-xl border-2 border-b-3 border-emerald-500 bg-white px-3.5 py-1 text-xs font-extrabold uppercase tracking-wide text-emerald-600 shadow-sm dark:bg-[#112018] dark:text-emerald-400">
@@ -225,7 +229,7 @@ export const SkillTree: React.FC<SkillTreeProps> = React.memo(
                       </button>
 
                       {/* Lesson Title & Subtitle */}
-                      <div className="mt-2.5 max-w-[240px] text-center">
+                      <div className="mt-2.5 max-w-[215px] text-center sm:max-w-[240px]">
                         <div
                           className={`font-display text-sm font-bold ${
                             isLocked

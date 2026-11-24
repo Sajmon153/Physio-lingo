@@ -540,12 +540,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         {/* Top Modal Section Switcher: Konto | Statystyki | Offline / PWA */}
-        <div className="mt-3.5 grid grid-cols-3 gap-1.5 rounded-2xl border border-[#d6e7dc] bg-[#f4faf6] p-1 dark:border-[#233d2f] dark:bg-[#182b21]">
+        <div className="mt-3.5 grid grid-cols-3 gap-1 rounded-2xl border border-[#d6e7dc] bg-[#f4faf6] p-1 dark:border-[#233d2f] dark:bg-[#182b21]">
           <button
             type="button"
             data-testid="account-modal-tab-account"
             onClick={() => setModalTab('account')}
-            className={`inline-flex items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-extrabold transition ${
+            className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-1.5 py-1.5 text-[11px] font-extrabold transition sm:px-2 sm:text-xs ${
               modalTab === 'account'
                 ? 'bg-emerald-500 text-white shadow-sm'
                 : 'text-[#354c3f] hover:text-emerald-950 dark:text-[#c7dbcf]'
@@ -558,20 +558,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             type="button"
             data-testid="account-modal-tab-stats"
             onClick={() => setModalTab('stats')}
-            className={`inline-flex items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-extrabold transition ${
+            className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-1.5 py-1.5 text-[11px] font-extrabold transition sm:px-2 sm:text-xs ${
               modalTab === 'stats'
                 ? 'bg-emerald-500 text-white shadow-sm'
                 : 'text-[#354c3f] hover:text-emerald-950 dark:text-[#c7dbcf]'
             }`}
           >
             <BarChart3 className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Statystyki ({overallPct}%)</span>
+            <span className="truncate">
+              <span className="sm:hidden">Postępy</span>
+              <span className="hidden sm:inline">Statystyki ({overallPct}%)</span>
+            </span>
           </button>
           <button
             type="button"
             data-testid="account-modal-tab-offline"
             onClick={() => setModalTab('offline')}
-            className={`inline-flex items-center justify-center gap-1 rounded-xl px-2 py-1.5 text-xs font-extrabold transition ${
+            className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-xl px-1.5 py-1.5 text-[11px] font-extrabold transition sm:px-2 sm:text-xs ${
               modalTab === 'offline'
                 ? 'bg-emerald-500 text-white shadow-sm'
                 : 'text-[#354c3f] hover:text-emerald-950 dark:text-[#c7dbcf]'
@@ -582,7 +585,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             ) : (
               <WifiOff className="h-3.5 w-3.5 shrink-0" />
             )}
-            <span className="truncate">Offline / PWA</span>
+            <span className="truncate">
+              Offline<span className="hidden sm:inline"> / PWA</span>
+            </span>
           </button>
         </div>
 
