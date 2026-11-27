@@ -35,6 +35,11 @@ const PatientSimulator3DView = lazy(() =>
     default: m.PatientSimulator3DView,
   })),
 );
+const MuscleActionsView = lazy(() =>
+  import('./components/MuscleActionsView').then((m) => ({
+    default: m.MuscleActionsView,
+  })),
+);
 const LessonPlayer = lazy(() =>
   import('./components/LessonPlayer').then((m) => ({ default: m.LessonPlayer })),
 );
@@ -90,8 +95,8 @@ export default function App() {
   const [activeView, setActiveView] = useState<AppView>('tree');
   const [explorerRegion, setExplorerRegion] = useState<ViewportModelMode>('shoulder');
   const [explorerJumpTarget, setExplorerJumpTarget] = useState<ExplorerJumpTarget | null>(null);
-  const [pinExamInitialMode] = useState<PinHubMode>('locate');
-  const [pinExamModeRequestId] = useState(0);
+  const [pinExamInitialMode, setPinExamInitialMode] = useState<PinHubMode>('locate');
+  const [pinExamModeRequestId, setPinExamModeRequestId] = useState(0);
   const jumpCounterRef = useRef(1);
 
   const [activeSession, setActiveSession] = useState<{
@@ -702,6 +707,31 @@ export default function App() {
                   onInspectStructureIn3D={(structureId) => {
                     const st = ANATOMY_MAP[structureId];
                     if (st) handleOpenStructureIn3D(st);
+                  }}
+                />
+              </Suspense>
+            )}
+
+            {activeView === 'muscle_actions' && (
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[420px] items-center justify-center rounded-2xl border-2 border-[#d6e7dc] bg-white text-sm font-bold text-[#52695b] dark:border-[#233d2f] dark:bg-[#112018] dark:text-[#c7dbcf]">
+                    Ładowanie modułu Ruchy mięśni 3D...
+                  </div>
+                }
+              >
+                <MuscleActionsView
+                  isDarkMode={isDarkMode}
+                  onShowIn3D={handleOpenStructureIn3D}
+                  onVisualizeClinicalTest={handleVisualizeClinicalTestIn3D}
+                  onRecordQuizOutcome={(structureId, isCorrect, xpGain) =>
+                    handlePinExamOutcome(isCorrect, structureId, xpGain)
+                  }
+                  onCompleteQuizHistory={handleCompletePinExamHistory}
+                  onOpenSrsMusclesDeck={() => {
+                    setPinExamInitialMode('srs');
+                    setPinExamModeRequestId((n) => n + 1);
+                    setActiveView('pin_exam');
                   }}
                 />
               </Suspense>

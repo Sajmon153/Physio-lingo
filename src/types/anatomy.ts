@@ -223,7 +223,7 @@ export interface SrsCardState {
 export interface PinExamHistoryEntry {
   id: string;
   date: string; // YYYY-MM-DD
-  mode: 'locate' | 'identify' | 'dermatomes' | 'biomechanics';
+  mode: 'locate' | 'identify' | 'dermatomes' | 'biomechanics' | 'muscle_actions';
   region: string;
   correctCount: number;
   totalCount: number;

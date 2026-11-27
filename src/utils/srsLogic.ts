@@ -2,6 +2,7 @@ import { ANATOMY_DB, ANATOMY_MAP } from '../data/anatomyDb';
 import { BIOMECHANICS_MOVEMENTS } from '../data/biomechanicsDb';
 import { CLINICAL_TESTS_DB, type ClinicalTestCategory } from '../data/clinicalTestsDb';
 import { DERMATOME_MYOTOME_LEVELS } from '../data/dermatomesMyotomes';
+import { MUSCLE_ACTIONS_DB } from '../data/muscleActionsDb';
 import { formatBilingualName } from '../three/anatomyTranslator';
 import { RegionId, SrsCardState } from '../types/anatomy';
 import { getLocalDateKey, getStructureDetailLabels } from './gameLogic';
@@ -10,6 +11,7 @@ export type SrsRating = 'again' | 'hard' | 'good' | 'easy';
 export type SrsDeckId =
   | 'all'
   | 'anatomy'
+  | 'muscle_actions'
   | 'orthopedic'
   | 'kinesitherapy'
   | 'dermatomes'
@@ -52,7 +54,12 @@ export const SRS_DECK_META: Array<{
   {
     id: 'all',
     label: 'Wszystkie fiszki',
-    subtitle: `Anatomia (${ANATOMY_DB.length}) + testy (${CLINICAL_TESTS_DB.length}) + dermatomy (${DERMATOME_MYOTOME_LEVELS.length}) + biomechanika i SFTR (${BIOMECHANICS_MOVEMENTS.length})`,
+    subtitle: `Anatomia (${ANATOMY_DB.length}) + ruchy mięśni (${MUSCLE_ACTIONS_DB.length}) + testy (${CLINICAL_TESTS_DB.length}) + dermatomy (${DERMATOME_MYOTOME_LEVELS.length}) + biomechanika (${BIOMECHANICS_MOVEMENTS.length})`,
+  },
+  {
+    id: 'muscle_actions',
+    label: 'Ruchy mięśni i Punctum Fixum',
+    subtitle: `Ruchy główne i pomocnicze, podział na aktony, łańcuch zamknięty i pułapki (${MUSCLE_ACTIONS_DB.length} mięśni)`,
   },
   {
     id: 'anatomy',
@@ -354,7 +361,69 @@ export function getAllSrsCards(): SrsFlashcard[] {
     };
   });
 
-  cachedAllCards = [...anatomyCards, ...clinicalCards, ...dermatomeCards, ...biomechanicsCards];
+  const muscleActionCards: SrsFlashcard[] = MUSCLE_ACTIONS_DB.map((profile) => {
+    const anat = ANATOMY_MAP[profile.muscleId];
+    const primaryMoves = profile.actions
+      .filter((a) => a.role === 'primary')
+      .map((a) => `${a.jointLabelPl}: ${a.movementLabelPl} (${a.sftrRangePl})`)
+      .join(' • ');
+    const secondaryMoves = profile.actions
+      .filter((a) => a.role === 'secondary')
+      .map((a) => `${a.jointLabelPl}: ${a.movementLabelPl}`)
+      .join(' • ');
+
+    const sections: SrsFlashcardSection[] = [
+      { label: 'Główne ruchy w stawach', value: primaryMoves || profile.openChainSummaryPl, tone: 'emerald' },
+    ];
+    if (secondaryMoves) {
+      sections.push({ label: 'Ruchy pomocnicze', value: secondaryMoves, tone: 'neutral' });
+    }
+    if (profile.subparts && profile.subparts.length > 0) {
+      sections.push({
+        label: 'Podział na aktony / głowy',
+        value: profile.subparts.map((s) => `${s.namePl}: ${s.actionsPl}`).join(' | '),
+        tone: 'amber',
+      });
+    }
+    sections.push(
+      {
+        label: 'Punctum Fixum — łańcuch zamknięty (odwrócony przyczep)',
+        value: profile.closedChainReversedPl,
+        tone: 'emerald',
+      },
+      {
+        label: 'Pozycja rozciągania / PIR',
+        value: profile.stretchingPositionPl,
+        tone: 'neutral',
+      },
+      {
+        label: 'Pułapka egzaminacyjna',
+        value: profile.examTrapPl,
+        tone: 'rose',
+      },
+    );
+
+    return {
+      id: `srs_musc_${profile.muscleId}`,
+      deck: 'muscle_actions',
+      badge: `Ruchy mięśnia • ${profile.regionGroupPl}`,
+      region: profile.region,
+      frontTitle: `${anat?.namePl ?? profile.muscleId} — ruchy i łańcuch zamknięty`,
+      frontSubtitle: anat?.nameEn,
+      frontPrompt:
+        'Przypomnij główne ruchy mięśnia, podział na aktony/głowy (jeśli dotyczy), czynność w łańcuchu zamkniętym (odwrócony przyczep) oraz pozycję rozciągania.',
+      backSections: sections,
+      targetStructureId: profile.muscleId,
+    };
+  });
+
+  cachedAllCards = [
+    ...anatomyCards,
+    ...muscleActionCards,
+    ...clinicalCards,
+    ...dermatomeCards,
+    ...biomechanicsCards,
+  ];
   return cachedAllCards;
 }
 

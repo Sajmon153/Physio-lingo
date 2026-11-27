@@ -704,7 +704,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                             ? 'Derm.'
                             : entry.mode === 'biomechanics'
                               ? 'Biom.'
-                              : 'Szp.'}
+                              : entry.mode === 'muscle_actions'
+                                ? 'Mięś.'
+                                : 'Szp.'}
                       </span>
                       <span>{entry.region}</span>
                       <span className="font-mono-tabular font-extrabold text-emerald-700 dark:text-emerald-300">

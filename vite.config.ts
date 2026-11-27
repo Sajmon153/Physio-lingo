@@ -55,6 +55,11 @@ export default defineConfig(() => {
                 test: /src[\\/]data[\\/](clinicalTestsDb|dermatomesMyotomes|nerveMuscleMap|patientCasesDb|biomechanicsDb)/,
                 priority: 14,
               },
+              {
+                name: 'data-muscles',
+                test: /src[\\/]data[\\/]muscleActions/,
+                priority: 14,
+              },
             ],
           },
         },

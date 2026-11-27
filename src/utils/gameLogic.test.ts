@@ -31,6 +31,23 @@ import {
   resolveMuscleBiomechanicsRole,
 } from '../data/biomechanicsDb.ts';
 import {
+  buildMuscleActionsQuizQuestions,
+  compareTwoMuscles,
+  findMusclesByJointAndMovement,
+  JOINT_MOVEMENT_CATALOG,
+  MUSCLE_ACTIONS_DB,
+  MUSCLE_ACTIONS_MAP,
+} from '../data/muscleActionsDb.ts';
+import {
+  classifyBoneSegment,
+  computeFiberBundlePoints,
+  computeJointPivotFromBoneBoxes,
+  computeProtractorArcPoints,
+  deriveMuscleAnchorsFromBox,
+  evaluateKinematicFrame,
+  SIMULATOR_SCENE_FILES,
+} from '../three/muscleKinematics.ts';
+import {
   buildBoneSurfaceZones,
   detectHitBoneSurfaceZone,
   doesLandmarkAttachMuscle,
@@ -485,13 +502,18 @@ test('mirrored left-side bones reverse inverted CW winding and every skeletal mu
     'm_procerus',
     'm_levator_labii_superioris_alaeque_nasi',
   ]);
+  const nonBonyInsertionIds = new Set([
+    'm_diaphragma', // PK na niekostnym środku ścięgnistym (centrum tendineum)
+  ]);
   for (const entry of ANATOMY_DB) {
     if (entry.category !== 'muscle' || nonBonyFacialIds.has(entry.id)) continue;
     const roles = BONY_LANDMARKS.map((lm) =>
       getLandmarkAttachmentRoleForMuscle(lm, entry.id, entry.namePl),
     ).filter(Boolean);
     assert.ok(roles.includes('pp'), `Muscle ${entry.id} (${entry.namePl}) is missing a PP origin zone`);
-    assert.ok(roles.includes('pk'), `Muscle ${entry.id} (${entry.namePl}) is missing a PK insertion zone`);
+    if (!nonBonyInsertionIds.has(entry.id)) {
+      assert.ok(roles.includes('pk'), `Muscle ${entry.id} (${entry.namePl}) is missing a PK insertion zone`);
+    }
   }
 });
 
@@ -605,7 +627,11 @@ test('Phase 5: clinical & kinesitherapy DB (50 entries), SRS SM-2 flashcards (21
   const allSrs = getAllSrsCards();
   assert.equal(
     allSrs.length,
-    ANATOMY_DB.length + CLINICAL_TESTS_DB.length + DERMATOME_MYOTOME_LEVELS.length + BIOMECHANICS_MOVEMENTS.length,
+    ANATOMY_DB.length +
+      MUSCLE_ACTIONS_DB.length +
+      CLINICAL_TESTS_DB.length +
+      DERMATOME_MYOTOME_LEVELS.length +
+      BIOMECHANICS_MOVEMENTS.length,
   );
   assert.equal(buildSrsDeck('anatomy').length, ANATOMY_DB.length);
   assert.equal(buildSrsDeck('orthopedic').length, 28);
@@ -730,7 +756,11 @@ test('Phase 6: extended anatomical systems (arteries, veins, nerves, organs, bur
   }
   assert.equal(
     getAllSrsCards().length,
-    ANATOMY_DB.length + CLINICAL_TESTS_DB.length + DERMATOME_MYOTOME_LEVELS.length + BIOMECHANICS_MOVEMENTS.length,
+    ANATOMY_DB.length +
+      MUSCLE_ACTIONS_DB.length +
+      CLINICAL_TESTS_DB.length +
+      DERMATOME_MYOTOME_LEVELS.length +
+      BIOMECHANICS_MOVEMENTS.length,
   );
 
   // 2. Unified Deltoid grouping per side (all 3 aktony merge; non-muscle deltoid items do NOT merge)
@@ -961,7 +991,11 @@ test('Phase 8 (v3): 3D Dermatome/Myotome map (C4–S2), enriched 50 Clinical Tes
   assert.ok(dermDeck.every((c) => c.id.startsWith('srs_derm_') && c.backSections.length >= 4));
   assert.equal(
     getAllSrsCards().length,
-    ANATOMY_DB.length + CLINICAL_TESTS_DB.length + DERMATOME_MYOTOME_LEVELS.length + BIOMECHANICS_MOVEMENTS.length,
+    ANATOMY_DB.length +
+      MUSCLE_ACTIONS_DB.length +
+      CLINICAL_TESTS_DB.length +
+      DERMATOME_MYOTOME_LEVELS.length +
+      BIOMECHANICS_MOVEMENTS.length,
   );
 
   // 4. Dermatome 3D quiz generator produces unique targets & 4 unique options with exactly 1 correct answer
@@ -992,7 +1026,11 @@ test('Phase 9 (v4): 5-stage Patient Simulator 3D (12 cases), fizjoterapeuty.pl t
   assert.equal(CLINICAL_TESTS_DB.length, 54);
   assert.equal(
     getAllSrsCards().length,
-    ANATOMY_DB.length + CLINICAL_TESTS_DB.length + DERMATOME_MYOTOME_LEVELS.length + BIOMECHANICS_MOVEMENTS.length,
+    ANATOMY_DB.length +
+      MUSCLE_ACTIONS_DB.length +
+      CLINICAL_TESTS_DB.length +
+      DERMATOME_MYOTOME_LEVELS.length +
+      BIOMECHANICS_MOVEMENTS.length,
   );
 
   // 2. Verify all 12 five-stage 3D patient cases and their real clickable 3D GLB meshes
@@ -1272,6 +1310,7 @@ test('Phase 10 (v5): Biomechanics 3D (7 joints / 24 movements, SFTR, Kaltenborn)
   assert.equal(
     getAllSrsCards().length,
     ANATOMY_DB.length +
+      MUSCLE_ACTIONS_DB.length +
       CLINICAL_TESTS_DB.length +
       DERMATOME_MYOTOME_LEVELS.length +
       BIOMECHANICS_MOVEMENTS.length,
@@ -1518,4 +1557,184 @@ test('Phase 11 (v6): Balanced 111 clinical cases, fizjoterapeuty.pl clinical rec
   });
   assert.equal(sprawlingGoal.usedHitPoint, true);
   assert.deepEqual(sprawlingGoal.target, { x: 0.25, y: 1.15, z: 0.12 });
+});
+
+test('Phase 12 (v7): 74-muscle Actions DB, real-bone 3D kinematics, reverse lookup, comparator, 4-type quiz & SRS deck', () => {
+  // 1. Exact 74-muscle inventory + 100% integrity across ANATOMY_DB, GLB nodes, Lovett links, zero banned Latin & zero external URLs
+  assert.equal(MUSCLE_ACTIONS_DB.length, 74);
+  assert.equal(new Set(MUSCLE_ACTIONS_DB.map((m) => m.muscleId)).size, 74);
+
+  const bannedLatin = /\b(musculus|ligamentum|tuberculum|articulatio|processus)\b/i;
+  const externalUrl = /https?:\/\/|youtube\.com|youtu\.be|anatomik\.pl/i;
+  const catalogKeySet = new Set(JOINT_MOVEMENT_CATALOG.map((c) => `${c.joint}:${c.movementKey}`));
+
+  const readGlbNodeNames = (relPath: string): string[] => {
+    const abs = path.resolve(process.cwd(), 'public', relPath.replace(/^\//, ''));
+    assert.equal(fs.existsSync(abs), true, `Missing GLB file: ${abs}`);
+    const buf = fs.readFileSync(abs);
+    const gltf = JSON.parse(buf.slice(20, 20 + buf.readUInt32LE(12)).toString('utf8')) as {
+      nodes?: Array<{ name?: string }>;
+    };
+    return (gltf.nodes ?? []).filter((n) => n.name).map((n) => n.name!);
+  };
+
+  const sceneNodes: Record<string, string[]> = {};
+  for (const [sceneKey, urls] of Object.entries(SIMULATOR_SCENE_FILES)) {
+    sceneNodes[sceneKey] = urls.flatMap(readGlbNodeNames);
+  }
+
+  for (const profile of MUSCLE_ACTIONS_DB) {
+    assert.ok(ANATOMY_MAP[profile.muscleId], `Missing ANATOMY_DB entry for ${profile.muscleId}`);
+    assert.ok(profile.actions.some((a) => a.role === 'primary'), `${profile.muscleId} must have >=1 primary action`);
+    assert.ok(profile.openChainSummaryPl.length > 20, `${profile.muscleId} missing openChainSummaryPl`);
+    assert.ok(profile.closedChainReversedPl.length > 20, `${profile.muscleId} missing closedChainReversedPl`);
+    assert.ok(profile.concentricWorkPl.length > 15, `${profile.muscleId} missing concentricWorkPl`);
+    assert.ok(profile.eccentricWorkPl.length > 15, `${profile.muscleId} missing eccentricWorkPl`);
+    assert.ok(profile.stretchingPositionPl.length > 15, `${profile.muscleId} missing stretchingPositionPl`);
+    assert.ok(profile.palpationLandmarkPl.length > 15, `${profile.muscleId} missing palpationLandmarkPl`);
+    assert.ok(profile.weaknessAndPalsyPl.length > 20, `${profile.muscleId} missing weaknessAndPalsyPl`);
+    assert.ok(profile.examTrapPl.length > 20, `${profile.muscleId} missing examTrapPl`);
+    assert.ok(profile.kinematicPresets.length >= 1, `${profile.muscleId} must have >=1 kinematicPreset`);
+
+    if (profile.lovettTestId) {
+      assert.ok(CLINICAL_TEST_MAP[profile.lovettTestId], `Invalid lovettTestId on ${profile.muscleId}`);
+    }
+    for (const linkedId of [...profile.synergistIds, ...profile.antagonistIds]) {
+      assert.ok(ANATOMY_MAP[linkedId], `Invalid linked muscle ${linkedId} on ${profile.muscleId}`);
+    }
+    for (const act of profile.actions) {
+      assert.ok(
+        catalogKeySet.has(`${act.joint}:${act.movementKey}`),
+        `Unknown catalog movement ${act.joint}:${act.movementKey} on ${profile.muscleId}`,
+      );
+    }
+
+    for (const preset of profile.kinematicPresets) {
+      const nodes = sceneNodes[preset.scene];
+      assert.ok(nodes && nodes.length > 20, `Missing nodes for scene ${preset.scene}`);
+      if (!preset.explicitAnchors) {
+        const re = new RegExp(preset.meshPattern || profile.meshMatchPattern, 'i');
+        assert.ok(
+          nodes.some((n) => re.test(n)),
+          `No GLB mesh match for ${profile.muscleId}/${preset.id} in ${preset.scene}`,
+        );
+      }
+    }
+
+    const serialized = JSON.stringify(profile);
+    assert.equal(bannedLatin.test(serialized), false, `Banned Latin found in ${profile.muscleId}`);
+    assert.equal(externalUrl.test(serialized), false, `External link found in ${profile.muscleId}`);
+  }
+
+  // 2. Verify high-yield anatomical exam truths across tricky muscles
+  assert.equal(MUSCLE_ACTIONS_MAP.m_deltoideus.subparts?.length, 3);
+  assert.equal(MUSCLE_ACTIONS_MAP.m_trapezius.subparts?.length, 3);
+  assert.equal(MUSCLE_ACTIONS_MAP.m_pectoralis_major.subparts?.length, 3);
+  assert.equal(MUSCLE_ACTIONS_MAP.m_quadriceps_femoris.subparts?.length, 4);
+  assert.equal(MUSCLE_ACTIONS_MAP.m_gastrocnemius.biarticular, true);
+  assert.equal(MUSCLE_ACTIONS_MAP.m_soleus.biarticular, false);
+  assert.ok(/60|90/.test(MUSCLE_ACTIONS_MAP.m_piriformis.openChainSummaryPl));
+  assert.ok(/odblokow/i.test(MUSCLE_ACTIONS_MAP.m_popliteus.closedChainReversedPl));
+  assert.ok(/przeciwn/i.test(MUSCLE_ACTIONS_MAP.m_sternocleidomastoideus.openChainSummaryPl));
+  assert.ok(/tę samą|ipsilateral/i.test(MUSCLE_ACTIONS_MAP.m_splenius_capitis.openChainSummaryPl));
+  assert.ok(/L5/i.test(ANATOMY_MAP.m_extensor_hallucis_longus.spinalSegments));
+  assert.ok(/C3–C5/i.test(ANATOMY_MAP.m_diaphragma.spinalSegments));
+
+  // 3. Verify pure real-bone 3D kinematic engine math (including GLTFLoader dot-stripped sanitized names!)
+  assert.equal(classifyBoneSegment('Humerus.003', 'shoulder'), 'distal');
+  assert.equal(classifyBoneSegment('Humerus003', 'shoulder'), 'distal');
+  assert.equal(classifyBoneSegment('Scapula.003', 'shoulder'), 'proximal');
+  assert.equal(classifyBoneSegment('Scapula003', 'shoulder'), 'proximal');
+  assert.equal(classifyBoneSegment('Clavicle001', 'shoulder'), 'proximal');
+  assert.equal(classifyBoneSegment('Scapula.003', 'scapula'), 'distal');
+  assert.equal(classifyBoneSegment('Radius003', 'radioulnar'), 'distal');
+  assert.equal(classifyBoneSegment('Ulna003', 'radioulnar'), 'proximal');
+  assert.equal(classifyBoneSegment('Femur003', 'hip'), 'distal');
+  assert.equal(classifyBoneSegment('Hip_bone003', 'hip'), 'proximal');
+  assert.equal(classifyBoneSegment('Tibia003', 'knee'), 'distal');
+  assert.equal(classifyBoneSegment('Femur.003', 'knee'), 'proximal');
+  assert.equal(classifyBoneSegment('Talus001', 'ankle'), 'distal');
+  assert.equal(classifyBoneSegment('Talus.001', 'subtalar'), 'proximal');
+  assert.equal(classifyBoneSegment('Calcaneus001', 'subtalar'), 'distal');
+  assert.equal(classifyBoneSegment('Mandible', 'tmj'), 'distal');
+  assert.equal(classifyBoneSegment('Frontal_bone', 'tmj'), 'proximal');
+  assert.equal(classifyBoneSegment('Vertebra_C4', 'cervical_spine'), 'distal');
+  assert.equal(classifyBoneSegment('Vertebra_C6', 'cervical_spine'), 'proximal');
+  assert.equal(classifyBoneSegment('Trochanteric bursa of gluteus maximus', 'hip'), 'ignore');
+
+  const deltoidPreset = MUSCLE_ACTIONS_MAP.m_deltoideus.kinematicPresets[0];
+  const concStart = evaluateKinematicFrame(deltoidPreset, 0, 'concentric');
+  const concEnd = evaluateKinematicFrame(deltoidPreset, 1, 'concentric');
+  assert.equal(concStart.movingSegment, 'distal');
+  assert.equal(concEnd.sweepAngleDeg, 105);
+  assert.ok(concEnd.fiberThicknessScale > concStart.fiberThicknessScale, 'Concentric contraction thickens muscle belly');
+  assert.ok(concEnd.rotationRad.z < 0, 'Right shoulder abduction rotates around -Z toward -X');
+
+  const eccEnd = evaluateKinematicFrame(deltoidPreset, 1, 'eccentric');
+  assert.equal(eccEnd.motionT, 0, 'Eccentric lengthens back toward start angle');
+  assert.ok(eccEnd.fiberThicknessScale < concEnd.fiberThicknessScale, 'Eccentric elongation thins belly relative to concentric peak');
+
+  const closedEnd = evaluateKinematicFrame(deltoidPreset, 1, 'closed_chain');
+  assert.equal(closedEnd.movingSegment, 'proximal');
+  assert.ok(closedEnd.rotationRad.z > 0, 'Closed chain inverts rotation sign onto proximal segment');
+
+  // Right-sided QL & Scaleni bend upward spine (+Y) ipsilaterally to anatomical right (-X) via +Z rotation
+  const qlFrame = evaluateKinematicFrame(MUSCLE_ACTIONS_MAP.m_quadratus_lumborum.kinematicPresets[0], 1, 'concentric');
+  assert.ok(qlFrame.rotationRad.z > 0, 'Right QL lateral flexion rotates upward spine around +Z toward -X');
+  const scmFrame = evaluateKinematicFrame(MUSCLE_ACTIONS_MAP.m_sternocleidomastoideus.kinematicPresets[0], 1, 'concentric');
+  assert.ok(scmFrame.rotationRad.y > 0 && scmFrame.rotationRad.z > 0, 'Right SCM rotates face left (+Y) and tilts head right (+Z)');
+
+  const pivot = computeJointPivotFromBoneBoxes('hip', {
+    'Femur.003': { min: { x: -0.15, y: 0.43, z: -0.06 }, max: { x: -0.03, y: 0.885, z: 0.02 } },
+  });
+  assert.ok(pivot.y > 0.85 && pivot.y < 0.88, `Expected hip pivot near femoral head ~0.86, got ${pivot.y}`);
+
+  const anchors = deriveMuscleAnchorsFromBox(
+    { min: { x: -0.22, y: 1.15, z: -0.05 }, max: { x: -0.14, y: 1.40, z: 0.02 } },
+    'vertical',
+  );
+  assert.ok(anchors.pp.y > anchors.pk.y);
+
+  const strands = computeFiberBundlePoints(anchors.pp, anchors.pk, 1.15, 5, 11);
+  assert.equal(strands.length, 5);
+  assert.equal(strands[0].length, 11);
+  assert.deepEqual(strands[0][0], anchors.pp);
+  assert.deepEqual(strands[0][10], anchors.pk);
+
+  const arcPts = computeProtractorArcPoints(pivot, 'z', 0, -90, 0.1, 16);
+  assert.equal(arcPts.length, 17);
+
+  // 4. Reverse lookup ("Kto wykonuje ten ruch?"), 2-muscle comparator, 4-type quiz & SRS deck
+  const abdLookup = findMusclesByJointAndMovement('shoulder', 'shoulder_abduction');
+  assert.ok(abdLookup);
+  assert.ok(abdLookup.primary.some((m) => m.muscleId === 'm_deltoideus'));
+  assert.ok(abdLookup.primary.some((m) => m.muscleId === 'm_supraspinatus'));
+  assert.ok(abdLookup.antagonists.some((m) => m.muscleId === 'm_latissimus_dorsi'));
+
+  const calfCmp = compareTwoMuscles('m_gastrocnemius', 'm_soleus');
+  assert.ok(calfCmp);
+  assert.equal(calfCmp.areSynergists, true);
+  assert.equal(calfCmp.sameInnervation, true);
+  assert.ok(calfCmp.onlyInA.some((a) => a.joint === 'knee'));
+
+  const quizQs = buildMuscleActionsQuizQuestions({ count: 8, seed: 2026 });
+  assert.equal(quizQs.length, 8);
+  const quizKinds = new Set(quizQs.map((q) => q.kind));
+  assert.equal(quizKinds.size, 4, 'Mixed quiz must cover all 4 question types');
+  for (const q of quizQs) {
+    assert.equal(q.options.length, 4);
+    assert.equal(new Set(q.options).size, 4, `Duplicate options in ${q.id}`);
+    assert.ok(q.correctIndex >= 0 && q.correctIndex < 4);
+  }
+
+  const srsMuscles = buildSrsDeck('muscle_actions', 'all');
+  assert.equal(srsMuscles.length, 74);
+  assert.ok(srsMuscles.every((c) => c.id.startsWith('srs_musc_') && c.backSections.length >= 4));
+
+  // 5. Verify no forbidden Tailwind blue/sky/indigo classes in new v7 UI components
+  const forbiddenPalette = /\b(?:bg|text|border|ring|from|to|via)-(?:blue|sky|indigo)-\d{2,3}\b/;
+  for (const rel of ['src/components/MuscleActionsView.tsx', 'src/components/MuscleMotionSimulator3D.tsx']) {
+    const src = fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
+    assert.equal(forbiddenPalette.test(src), false, `Forbidden blue/sky/indigo class in ${rel}`);
+  }
 });

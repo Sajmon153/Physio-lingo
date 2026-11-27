@@ -1,8 +1,8 @@
 import React from 'react';
-import { BookOpen, Box, Crosshair, Map as MapIcon, Stethoscope } from 'lucide-react';
+import { BookOpen, Box, Crosshair, Dumbbell, Map as MapIcon, Stethoscope } from 'lucide-react';
 import { DeviceViewMode } from '../types/anatomy';
 
-export type AppView = 'tree' | 'explorer' | 'pin_exam' | 'cases' | 'atlas';
+export type AppView = 'tree' | 'explorer' | 'pin_exam' | 'cases' | 'muscle_actions' | 'atlas';
 
 interface NavigationBarProps {
   activeView: AppView;
@@ -22,6 +22,7 @@ const NAV_ITEMS: Array<{
   { id: 'explorer', label: 'Eksplorator 3D', shortLabel: 'Model 3D', icon: Box },
   { id: 'pin_exam', label: 'Szpilki 3D', shortLabel: 'Szpilki', icon: Crosshair },
   { id: 'cases', label: 'Przypadki 3D', shortLabel: 'Klinika', icon: Stethoscope },
+  { id: 'muscle_actions', label: 'Ruchy mięśni', shortLabel: 'Mięśnie', icon: Dumbbell },
   { id: 'atlas', label: 'Atlas / Słownik', shortLabel: 'Atlas', icon: BookOpen },
 ];
 
@@ -45,12 +46,12 @@ export const NavigationBar: React.FC<NavigationBarProps> = React.memo(({
         : 'hidden w-60 shrink-0 flex-col justify-between border-r-2 border-[#d6e7dc] bg-white p-4 dark:border-[#233d2f] dark:bg-[#112018] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64';
 
   const mobileBottomNavClasses = forceMobileNav
-    ? 'sticky bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-2 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95'
+    ? 'sticky bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-1 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95'
     : compactTabletRail
-      ? 'fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-2 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95 sm:hidden'
+      ? 'fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-1 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95 sm:hidden'
       : forceDesktopSidebar
         ? 'hidden'
-        : 'fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-2 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95 lg:hidden';
+        : 'fixed inset-x-0 bottom-0 z-30 flex items-center justify-around border-t-2 border-[#d6e7dc] bg-white/95 px-1 pt-1.5 pb-safe backdrop-blur-md dark:border-[#233d2f] dark:bg-[#112018]/95 lg:hidden';
 
   return (
     <>

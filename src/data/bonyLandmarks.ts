@@ -997,6 +997,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
       'Mięsień półścięgnisty (Semitendinosus muscle)',
       'Mięsień półbłoniasty (Semimembranosus muscle)',
       'Mięsień przywodziciel wielki — część kulszowa (Adductor magnus — hamstring part)',
+      'Mięsień czworoboczny uda — przyczep początkowy na brzegu bocznym guza kulszowego (Quadratus femoris muscle)',
+      'Mięsień zasłaniacz wewnętrzny — przyczep początkowy w obrębie otworu zasłonowego miednicy (Obturator internus muscle)',
       'Więzadło krzyżowo-guzowe (Sacrotuberous ligament)',
     ],
     clinicalNotes:
@@ -1018,7 +1020,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
       'Mięsień pośladkowy średni (Gluteus medius muscle)',
       'Mięsień pośladkowy mały (Gluteus minimus muscle)',
       'Mięsień gruszkowaty (Piriformis muscle)',
-      'Mięsień zasłaniacz wewnętrzny i mięśnie bliźniacze (Obturator internus and gemelli)',
+      'Mięsień zasłaniacz wewnętrzny i mięśnie bliźniacze — przyczep końcowy (Obturator internus and gemelli)',
+      'Mięsień czworoboczny uda — przyczep końcowy na grzebieniu międzykrętarzowym (Quadratus femoris muscle)',
     ],
     clinicalNotes:
       'Przyczep odwodzicieli i rotatorów zewnętrznych biodra. Zespół bólowy krętarza większego (GTPS) i zapalenie kaletki krętarzowej; dodatni objaw Trendelenburga przy osłabieniu m. pośladkowego średniego.',
@@ -1035,7 +1038,10 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     nameEn: 'Lesser trochanter of femur',
     bilingualName: 'Krętarz mniejszy kości udowej (Lesser trochanter of femur)',
     type: 'pk',
-    attachedMuscles: ['Mięsień biodrowo-lędźwiowy (Iliopsoas muscle)'],
+    attachedMuscles: [
+      'Mięsień biodrowo-lędźwiowy (Iliopsoas muscle)',
+      'Mięsień grzebieniowy — przyczep końcowy na kresie grzebieniowej poniżej krętarza mniejszego (Pectineus muscle)',
+    ],
     clinicalNotes:
       'Wyłączny przyczep końcowy mięśnia biodrowo-lędźwiowego (głównego zginacza biodra). Przykurcz pogłębia hiperlordozę lędźwiową (test Thomasa); złamania awulsyjne u młodzieży.',
   }),
@@ -1281,6 +1287,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięsień czworoboczny — część poprzeczna, przyczep początkowy (Middle trapezius muscle)',
       'Mięsień równoległoboczny mniejszy — przyczep początkowy (Rhomboid minor muscle)',
+      'Mięsień płatowaty głowy — przyczep początkowy na wyrostkach C7–Th3 i więzadle karkowym (Splenius capitis muscle)',
       'Mięsień zębaty tylny górny (Serratus posterior superior muscle)',
       'Więzadło karkowe (Nuchal ligament)',
     ],
@@ -1439,7 +1446,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pp',
     attachedMuscles: [
       'Mięsień skośny zewnętrzny brzucha — przyczep końcowy na wardze zewnętrznej (External abdominal oblique muscle)',
-      'Mięsień skośny wewnętrzny i poprzeczny brzucha — przyczep początkowy (Internal oblique and transversus abdominis)',
+      'Mięsień skośny wewnętrzny brzucha — przyczep początkowy na kresie pośredniej (Internal abdominal oblique muscle)',
+      'Mięsień poprzeczny brzucha — przyczep początkowy na wardze wewnętrznej (Transversus abdominis muscle)',
       'Mięsień czworoboczny lędźwi — przyczep początkowy (Quadratus lumborum muscle)',
       'Mięsień pośladkowy średni — przyczep początkowy (Gluteus medius muscle)',
       'Mięsień pośladkowy wielki — część tylna, przyczep początkowy (Gluteus maximus muscle)',
@@ -1560,6 +1568,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pk',
     attachedMuscles: [
       'Mięsień strzałkowy krótki — ścięgno końcowe (Fibularis brevis muscle)',
+      'Mięsień prostownik długi palców stopy — przyczep końcowy na paliczkach palców II–V stopy (Extensor digitorum longus muscle)',
       'Pasmo boczne rozcięgna podeszwowego (Lateral band of plantar aponeurosis)',
     ],
     clinicalNotes:
@@ -1579,6 +1588,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pk',
     attachedMuscles: [
       'Mięsień ramienno-promieniowy — przyczep końcowy u podstawy (Brachioradialis muscle)',
+      'Mięsień nawrotny czworoboczny — przyczep końcowy w dolnej 1/4 kości promieniowej (Pronator quadratus muscle)',
       'Więzadło poboczne promieniowe nadgarstka (Radial collateral ligament of wrist)',
     ],
     clinicalNotes:
@@ -1597,6 +1607,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     bilingualName: 'Wyrostek rylcowaty kości łokciowej (Ulnar styloid process)',
     type: 'landmark',
     attachedMuscles: [
+      'Mięsień nawrotny czworoboczny — przyczep początkowy w dolnej 1/4 kości łokciowej (Pronator quadratus muscle)',
       'Więzadło poboczne łokciowe nadgarstka (Ulnar collateral ligament of wrist)',
       'Kompleks chrząstki trójkątnej (Triangular fibrocartilage complex — TFCC)',
     ],
@@ -1931,7 +1942,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'landmark',
     attachedMuscles: [
       'Więzadło obrączkowate kości promieniowej (Annular ligament of radius)',
-      'Mięsień odwracacz — poniżej szyjki (Supinator muscle)',
+      'Mięsień odwracacz — przyczep końcowy na górnej 1/3 kości promieniowej (Supinator muscle)',
     ],
     clinicalNotes:
       'Obraca się wewnątrz więzadła obrączkowatego podczas pronacji i supinacji przedramienia. Typowe miejsce złamań przy upadku na wyprostowaną kończynę oraz podwichnięcia u dzieci („łokieć piastunki”).',
@@ -1951,6 +1962,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięsień ramienny — przyczep końcowy na guzowatości (Brachialis muscle)',
       'Mięsień nawrotny obły — głowa łokciowa (Pronator teres — ulnar head)',
+      'Mięsień zginacz głęboki palców — przyczep początkowy na górnych 2/3 kości łokciowej (Flexor digitorum profundus muscle)',
     ],
     clinicalNotes:
       'Tworzy przednio-dolną wargę wcięcia bloczkowego kości łokciowej, stanowiąc kluczowy opór kostny przeciwko tylnemu zwichnięciu stawu łokciowego.',
@@ -1987,7 +1999,11 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pp',
     attachedMuscles: [
       'Mięsień prosty brzucha — przyczep początkowy na grzebieniu łonowym (Rectus abdominis muscle)',
-      'Mięsień przywodziciel długi, krótki i smukły — przyczep początkowy (Adductor longus, brevis and gracilis)',
+      'Mięsień grzebieniowy — przyczep początkowy na grzebieniu kości łonowej (Pectineus muscle)',
+      'Mięsień przywodziciel długi — przyczep początkowy (Adductor longus muscle)',
+      'Mięsień przywodziciel krótki — przyczep początkowy na gałęzi dolnej kości łonowej (Adductor brevis muscle)',
+      'Mięsień smukły — przyczep początkowy (Gracilis muscle)',
+      'Mięsień poprzeczny brzucha — przyczep końcowy na kresie białej i grzebieniu łonowym (Transversus abdominis muscle)',
       'Więzadło pachwinowe — przyczep przyśrodkowy (Inguinal ligament)',
     ],
     clinicalNotes:
@@ -2045,7 +2061,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
       'Mięsień czworogłowy uda — głowa boczna i przyśrodkowa, przyczep początkowy (Quadriceps femoris — vastus lateralis and medialis)',
       'Mięsień dwugłowy uda — głowa krótka, przyczep początkowy (Biceps femoris — short head)',
       'Mięsień przywodziciel wielki — przyczep końcowy (Adductor magnus muscle)',
-      'Mięsień przywodziciel długi i krótki — przyczep końcowy (Adductor longus and brevis muscles)',
+      'Mięsień przywodziciel długi — przyczep końcowy (Adductor longus muscle)',
+      'Mięsień przywodziciel krótki — przyczep końcowy w górnej 1/3 kresy chropawej (Adductor brevis muscle)',
     ],
     clinicalNotes:
       'Podłużna dwuwargowa listwa kostna na tylnej powierzchni trzonu kości udowej, stanowiąca główną oś przyczepu przegrody międzymięśniowej, głów obszernych m. czworogłowego oraz grupy przywodzicieli.',
@@ -2118,6 +2135,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięsień strzałkowy długi — przyczep początkowy (Fibularis longus muscle)',
       'Mięsień strzałkowy krótki — przyczep początkowy (Fibularis brevis muscle)',
+      'Mięsień prostownik długi palucha — przyczep początkowy na środkowej części strzałki (Extensor hallucis longus muscle)',
+      'Mięsień zginacz długi palucha — przyczep początkowy na dolnych 2/3 tylnej powierzchni strzałki (Flexor hallucis longus muscle)',
     ],
     clinicalNotes:
       'Pole przyczepu początkowego mięśni przedziału bocznego podudzia (głównych nawracaczy / ewertorów stopy chroniących staw skokowy przed urazem supinacyjnym).',
@@ -2253,6 +2272,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięsień piszczelowy przedni — strona przyśrodkowo-podeszwowa, przyczep końcowy (Tibialis anterior muscle)',
       'Mięsień strzałkowy długi — strona boczno-podeszwowa, przyczep końcowy (Fibularis longus muscle)',
+      'Mięsień prostownik długi palucha — przyczep końcowy na paliczku dalszym palucha (Extensor hallucis longus muscle)',
+      'Mięsień zginacz długi palucha — przyczep końcowy na podeszwowej podstawie paliczka dalszego palucha (Flexor hallucis longus muscle)',
     ],
     clinicalNotes:
       'Miejsce utworzenia tzw. strzemienia ścięgnistego stopy (stirrup of the foot) przez zbieżne przyczepy końcowe m. piszczelowego przedniego (od strony przyśrodkowej) oraz m. strzałkowego długiego (od strony podeszwowo-bocznej), podtrzymującego sklepienie poprzeczne i podłużne stopy.',
@@ -2362,6 +2383,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięśnie pochyłe — guzki przednie i tylne wyrostków C3–C6, przyczep początkowy (Scalene muscles)',
       'Mięsień dźwigacz łopatki — guzki tylne wyrostków C1–C4, przyczep początkowy (Levator scapulae muscle)',
+      'Mięsień długi szyi — przyczep końcowy pasm skośnych na C1–C6 (Longus colli muscle)',
     ],
     clinicalNotes:
       'Guzki przednie i tylne wyrostków poprzecznych kręgów szyjnych stanowią przyczep początkowy mięśni pochyłych (tworzących szczelinę pochyłych dla splotu ramiennego) oraz dźwigacza łopatki.',
@@ -2417,6 +2439,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pk',
     attachedMuscles: [
       'Mięsień prostownik grzbietu — pasmo najdłuższe grzbietu, przyczep końcowy (Erector spinae — longissimus thoracis)',
+      'Mięsień długi szyi — przyczep początkowy na trzonach C5–Th3 (Longus colli muscle)',
     ],
     clinicalNotes:
       'Wyrostki poprzeczne kręgów piersiowych stanowią miejsce przyczepu końcowego m. najdłuższego grzbietu (środkowego pasma prostownika grzbietu) oraz punkt stawu żebrowo-poprzecznego.',
@@ -2455,6 +2478,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pp',
     attachedMuscles: [
       'Mięsień biodrowo-lędźwiowy — m. lędźwiowy większy, przyczep początkowy (Iliopsoas — psoas major muscle)',
+      'Przepona — odnogi lędźwiowe L1–L3, przyczep początkowy (Thoracic diaphragm)',
     ],
     clinicalNotes:
       'Boczne powierzchnie trzonów i krążków międzykręgowych Th12–L4 dają początek mięśniowi lędźwiowemu większemu, który razem z m. biodrowym z dołu biodrowego biegnie ku krętarzowi mniejszemu kości udowej.',
@@ -2491,6 +2515,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     position: [0.0000, 1.2415, 0.1101],
     attachedMuscles: [
       'Mięsień prosty brzucha — przyczep końcowy (Rectus abdominis muscle)',
+      'Przepona — część mostkowa, przyczep początkowy (Thoracic diaphragm)',
     ],
     clinicalNotes:
       'Najniższa część mostka na poziomie kręgu Th9–Th10, stanowiąca górny przyczep (PK) mięśnia prostego brzucha oraz kresy białej brzucha.',
@@ -2546,6 +2571,7 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pk',
     attachedMuscles: [
       'Mięsień zginacz łokciowy nadgarstka — trzeszczka w ścięgnie, przyczep końcowy (Flexor carpi ulnaris muscle)',
+      'Mięsień prostownik łokciowy nadgarstka — przyczep końcowy na podstawie V kości śródręcza (Extensor carpi ulnaris muscle)',
     ],
     clinicalNotes:
       'Kość trzeszczkowata wtopiona w ścięgno końcowe mięśnia zginacza łokciowego nadgarstka (FCU). Wraz z haczykiem kości haczykowatej ogranicza kanał Guyona dla nerwu i tętnicy łokciowej.',
@@ -2564,6 +2590,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     type: 'pk',
     attachedMuscles: [
       'Mięsień prostownik palców — pasmo środkowe i boczne rozcięgna grzbietowego, przyczep końcowy (Extensor digitorum muscle)',
+      'Mięsień zginacz powierzchowny palców — przyczep końcowy na paliczkach środkowych II–V (Flexor digitorum superficialis muscle)',
+      'Mięsień zginacz głęboki palców — przyczep końcowy na paliczkach dalszych II–V (Flexor digitorum profundus muscle)',
     ],
     clinicalNotes:
       'Rozcięgno grzbietowe palców II–V skupia ścięgna m. prostownika palców. Uszkodzenie pasma środkowego nad stawem PIP powoduje deformację butonierkową (boutonnière), a dystalnego przyczepu — palec młoteczkowaty (mallet finger).',
@@ -2583,6 +2611,8 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
     attachedMuscles: [
       'Mięsień czworoboczny lędźwi — przyczep końcowy na dolnym brzegu (Quadratus lumborum muscle)',
       'Mięsień skośny zewnętrzny brzucha — żebra V–XII, przyczep początkowy (External abdominal oblique muscle)',
+      'Mięsień skośny wewnętrzny brzucha — dolne brzegi żeber X–XII, przyczep końcowy (Internal abdominal oblique muscle)',
+      'Przepona — część żebrowa żeber VII–XII, przyczep początkowy (Thoracic diaphragm)',
     ],
     clinicalNotes:
       'Ostatnie żebro wolne stabilizowane przez m. czworoboczny lędźwi (istotne podczas fazy wdechu — unieruchamia przyczep przepony). Częste źródło jednostronnego bólu okolicy lędźwiowej.',
