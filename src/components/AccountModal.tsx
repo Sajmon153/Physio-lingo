@@ -1024,12 +1024,28 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-1 text-[11px] leading-relaxed text-[#52695b] dark:text-[#94b0a0]">
-                      <strong>Chrome / Edge / Android:</strong> kliknij ikonę instalacji w pasku
-                      adresu lub menu → <em>Zainstaluj aplikację</em>.{' '}
-                      <strong>iPhone / iPad (Safari):</strong> kliknij <em>Udostępnij</em> →{' '}
-                      <em>Dodaj do ekranu początkowego</em>.
-                    </p>
+                    <div className="mt-1.5 space-y-2">
+                      <p className="text-[11px] leading-relaxed text-[#52695b] dark:text-[#94b0a0]">
+                        <strong>iPhone / iPad (Safari):</strong> kliknij <em>Udostępnij [↑]</em> →{' '}
+                        <em>Dodaj do ekranu początkowego</em>.{' '}
+                        <strong>Chrome / Edge / Android:</strong> kliknij ikonę instalacji w pasku
+                        adresu lub menu → <em>Zainstaluj aplikację</em>.
+                      </p>
+                      {onTriggerInstallPwa && (
+                        <button
+                          type="button"
+                          data-testid="offline-open-install-guide-btn"
+                          onClick={() => {
+                            onClose();
+                            onTriggerInstallPwa();
+                          }}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border-2 border-b-4 border-emerald-700 bg-emerald-500 px-3 py-1.5 text-xs font-extrabold text-white transition hover:bg-emerald-600 active:translate-y-0.5 active:border-b-2"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span>Otwórz przewodnik instalacji (iPad / Telefon / PC)</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

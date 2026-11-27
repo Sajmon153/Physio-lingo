@@ -1943,7 +1943,7 @@ test('Phase 13 (v7.1): per-vertex 3D muscle mesh deformation, isochoric swelling
     false,
   );
   assert.equal(androidMessenger.os, 'android');
-  assert.equal(androidMessenger.defaultTab, 'mobile');
+  assert.equal(androidMessenger.defaultTab, 'android');
   assert.equal(androidMessenger.isInAppBrowser, true);
 
   const ipadSafari = detectInstallEnvironment(
@@ -1952,7 +1952,18 @@ test('Phase 13 (v7.1): per-vertex 3D muscle mesh deformation, isochoric swelling
     false,
   );
   assert.equal(ipadSafari.os, 'ios');
-  assert.equal(ipadSafari.defaultTab, 'mobile');
+  assert.equal(ipadSafari.isIpad, true);
+  assert.equal(ipadSafari.defaultTab, 'ios');
+  assert.equal(ipadSafari.isInAppBrowser, false);
+
+  const ipadMessengerWebView = detectInstallEnvironment(
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
+    5,
+    false,
+  );
+  assert.equal(ipadMessengerWebView.os, 'ios');
+  assert.equal(ipadMessengerWebView.isIpad, true);
+  assert.equal(ipadMessengerWebView.isInAppBrowser, true);
 
   const winDesktop = detectInstallEnvironment(
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',

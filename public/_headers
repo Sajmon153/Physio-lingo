@@ -5,6 +5,13 @@
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
 
+# HTML entrypoints must revalidate so deployed UI updates appear immediately on iPad/iPhone/desktop
+/
+  Cache-Control: no-cache, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, must-revalidate
+
 # Service Worker must always revalidate so clients pick up PWA updates immediately
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate

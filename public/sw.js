@@ -10,7 +10,7 @@
  *  - Static assets (/assets/*, /favicon.svg, /manifest.webmanifest): STALE_WHILE_REVALIDATE
  */
 
-const APP_CACHE_NAME = 'physiolingo-app-v7';
+const APP_CACHE_NAME = 'physiolingo-app-v8';
 const MODELS_CACHE_NAME = 'physiolingo-models-v6';
 const ACTIVE_CACHES = [APP_CACHE_NAME, MODELS_CACHE_NAME];
 
@@ -145,10 +145,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. HTML document navigations -> NETWORK_FIRST with cached "/" fallback
+  // 2. HTML document navigations -> NETWORK_FIRST (bypassing browser HTTP cache) with cached "/" fallback
   if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.ok) {
             const copy = networkResponse.clone();

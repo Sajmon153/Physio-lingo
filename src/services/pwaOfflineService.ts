@@ -6,7 +6,7 @@
  * dermatomes, biomechanics, and clinical cases without internet access.
  */
 
-export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v7';
+export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v8';
 export const PHYSIOLINGO_MODELS_CACHE = 'physiolingo-models-v6';
 
 export type OfflinePackId =
@@ -453,14 +453,15 @@ export async function clearOfflineModelCache(): Promise<void> {
 // IMMEDIATE APP DOWNLOAD / PWA INSTALL DETECTION & LINK HELPERS
 // ============================================================================
 
-export type InstallPlatformTab = 'mobile' | 'desktop';
+export type InstallPlatformTab = 'ios' | 'android' | 'desktop';
 export type DetectedOsKind = 'android' | 'ios' | 'windows' | 'macos' | 'linux' | 'other';
 
 export interface InstallEnvironmentInfo {
   isStandalone: boolean;
   defaultTab: InstallPlatformTab;
   os: DetectedOsKind;
-  /** True when opened inside Messenger, Instagram, Facebook, TikTok or similar WebView */
+  isIpad: boolean;
+  /** True when opened inside Messenger, Instagram, Facebook, TikTok, Mail/Messages WebView */
   isInAppBrowser: boolean;
   browser: 'chromium' | 'safari' | 'firefox' | 'other';
 }
@@ -468,8 +469,8 @@ export interface InstallEnvironmentInfo {
 export const INSTALL_PROMPT_DISMISSED_SESSION_KEY = 'physiolingo_install_prompt_dismissed_v1';
 
 /**
- * Detects OS, browser engine, Messenger/Instagram WebView, and ideal default tab ('mobile' vs 'desktop')
- * so visitors opening a shared link immediately get tailored download instructions or 1-click install.
+ * Detects OS (distinguishing iPadOS even when reporting Macintosh desktop UA),
+ * Messenger/Instagram/WKWebView in-app browsers, and ideal default tab ('ios' | 'android' | 'desktop').
  */
 export function detectInstallEnvironment(
   userAgent?: string,
@@ -482,15 +483,21 @@ export function detectInstallEnvironment(
     maxTouchPoints ?? (typeof navigator !== 'undefined' ? navigator.maxTouchPoints || 0 : 0);
   const isStandalone = standaloneOverride ?? isStandalonePwaMode();
 
-  const isInAppBrowser =
-    /\b(FBAN|FBAV|FB_IAB|Messenger|Instagram|BytedanceWebview|musical_ly|TikTok|Line\/|LinkedInApp)\b/i.test(
+  // iPadOS 13+ reports Macintosh in UA with maxTouchPoints > 1
+  const isIpad = /\biPad\b/i.test(ua) || (/Macintosh/i.test(ua) && touchPts > 1);
+  const isIos = isIpad || /\b(iPhone|iPod)\b/i.test(ua);
+  const isAndroid = /\bAndroid\b/i.test(ua);
+
+  const explicitInAppToken =
+    /(FBAN|FBAV|FB_IAB|FBIOS|Messenger|Instagram|WhatsApp|BytedanceWebview|musical_ly|TikTok|Line\/|LinkedInApp|GSA\/)/i.test(
       ua,
     );
+  // On iOS/iPadOS, real Safari includes "Safari/" (and Chrome/Firefox/Edge include CriOS/FxiOS/EdgiOS).
+  // In-app WKWebViews (Messenger, Mail/Messages embedded browser, Telegram, Discord) omit "Safari/"!
+  const iosBareWebView =
+    isIos && !/Safari\//i.test(ua) && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua);
 
-  // iPadOS 13+ reports Macintosh in UA with maxTouchPoints > 1
-  const isIos =
-    /\b(iPhone|iPad|iPod)\b/i.test(ua) || (/Macintosh/i.test(ua) && touchPts > 1);
-  const isAndroid = /\bAndroid\b/i.test(ua);
+  const isInAppBrowser = explicitInAppToken || iosBareWebView;
 
   let os: DetectedOsKind = 'other';
   if (isIos) os = 'ios';
@@ -499,8 +506,11 @@ export function detectInstallEnvironment(
   else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macos';
   else if (/Linux|CrOS/i.test(ua)) os = 'linux';
 
-  const defaultTab: InstallPlatformTab =
-    os === 'ios' || os === 'android' || /\bMobile\b/i.test(ua) ? 'mobile' : 'desktop';
+  const defaultTab: InstallPlatformTab = isIos
+    ? 'ios'
+    : isAndroid || /\bMobile\b/i.test(ua)
+      ? 'android'
+      : 'desktop';
 
   let browser: InstallEnvironmentInfo['browser'] = 'other';
   if (/Firefox|FxiOS/i.test(ua)) {
@@ -515,6 +525,7 @@ export function detectInstallEnvironment(
     isStandalone,
     defaultTab,
     os,
+    isIpad,
     isInAppBrowser,
     browser,
   };
