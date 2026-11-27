@@ -40,11 +40,16 @@ import {
 } from '../data/muscleActionsDb.ts';
 import {
   classifyBoneSegment,
+  computeAnatomicalJointAxis,
   computeFiberBundlePoints,
   computeJointPivotFromBoneBoxes,
+  computePlaneHelperBasis,
   computeProtractorArcPoints,
+  deformMuscleGeometryInPlace,
   deriveMuscleAnchorsFromBox,
   evaluateKinematicFrame,
+  prepareDeformableMuscle,
+  sampleBoneSurfacePoints,
   SIMULATOR_SCENE_FILES,
 } from '../three/muscleKinematics.ts';
 import {
@@ -1736,5 +1741,194 @@ test('Phase 12 (v7): 74-muscle Actions DB, real-bone 3D kinematics, reverse look
   for (const rel of ['src/components/MuscleActionsView.tsx', 'src/components/MuscleMotionSimulator3D.tsx']) {
     const src = fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8');
     assert.equal(forbiddenPalette.test(src), false, `Forbidden blue/sky/indigo class in ${rel}`);
+  }
+});
+
+test('Phase 13 (v7.1): per-vertex 3D muscle mesh deformation, isochoric swelling, oblique joint axes & 103-preset plane/axis audit', () => {
+  // 1. True 3D anatomical oblique joint axes & coupled biomechanics
+  const mockForearmBoxes = {
+    Radius: { min: { x: -0.288, y: 0.856, z: -0.042 }, max: { x: -0.227, y: 1.093, z: 0.026 } },
+    Ulna: { min: { x: -0.256, y: 0.855, z: -0.06 }, max: { x: -0.203, y: 1.11, z: 0.024 } },
+  };
+  const ruAxis = computeAnatomicalJointAxis('radioulnar', 'y', mockForearmBoxes);
+  const ruLen = Math.hypot(ruAxis.x, ruAxis.y, ruAxis.z);
+  assert.ok(Math.abs(ruLen - 1) < 1e-6, 'Radioulnar axis must be unit-normalized');
+  assert.ok(ruAxis.y > 0.95 && Math.abs(ruAxis.x) > 0.02 && Math.abs(ruAxis.z) > 0.05, 'Radioulnar axis must be anatomical oblique');
+
+  const henkeAxis = computeAnatomicalJointAxis('subtalar', 'z');
+  assert.ok(henkeAxis.x > 0.1 && henkeAxis.y > 0.45 && henkeAxis.z > 0.75, 'Henke subtalar axis must be triplanar oblique');
+
+  assert.deepEqual(computePlaneHelperBasis('Płaszczyzna strzałkowa', henkeAxis).normal, { x: 1, y: 0, z: 0 });
+  assert.deepEqual(computePlaneHelperBasis('Płaszczyzna czołowa', henkeAxis).normal, { x: 0, y: 0, z: 1 });
+  assert.deepEqual(computePlaneHelperBasis('Płaszczyzna poprzeczna', henkeAxis).normal, { x: 0, y: 1, z: 0 });
+
+  // Scapulohumeral rhythm (2:1 above 30° abduction) + patellar glide
+  const abdPeak = evaluateKinematicFrame(MUSCLE_ACTIONS_MAP.m_deltoideus.kinematicPresets[0], 1, 'concentric');
+  assert.ok(abdPeak.coupledScapulaDeg < -20, `Expected upward scapular rotation < -20°, got ${abdPeak.coupledScapulaDeg}`);
+  assert.equal(abdPeak.coupledScapulaAxis, 'z');
+
+  const kneeStart = evaluateKinematicFrame(MUSCLE_ACTIONS_MAP.m_quadriceps_femoris.kinematicPresets[0], 0, 'concentric');
+  assert.ok(kneeStart.coupledPatellaDeg > 30, `Expected patellar flexion glide > 30° at 100° knee flexion, got ${kneeStart.coupledPatellaDeg}`);
+
+  // Piriformis flexed abduction secondary sweep fallback
+  const piriFlexAbd = MUSCLE_ACTIONS_MAP.m_piriformis.kinematicPresets.find((p) => p.id === 'piriformis_flexed_abduction')!;
+  const piriFrame = evaluateKinematicFrame(piriFlexAbd, 1, 'concentric');
+  assert.equal(piriFrame.totalRangeDeg, 30);
+  assert.equal(piriFrame.sweepAngleDeg, 30);
+
+  // 2. Per-vertex soft-tissue 3D muscle deformation: PP welded, PK articulates, concentric shortens & swells, antagonist lengthens & slims
+  const humerusMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.28, 10, 8));
+  humerusMesh.matrixAutoUpdate = false;
+  humerusMesh.matrix.makeTranslation(-0.21, 1.25, -0.028);
+
+  const radiusMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.24, 10, 8));
+  radiusMesh.matrixAutoUpdate = false;
+  radiusMesh.matrix.makeTranslation(-0.22, 0.97, -0.022);
+
+  const proxCloud = sampleBoneSurfacePoints([humerusMesh], 200);
+  const distCloud = sampleBoneSurfacePoints([radiusMesh], 200);
+  const elbowPivot = { x: -0.213, y: 1.101, z: -0.028 };
+
+  // Anterior flexor muscle belly spanning from humerus (y=1.30) to proximal radius (y=1.06) in front of elbow (z=-0.004)
+  const flexorGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.24, 16, 16);
+  const flexorWorld = new THREE.Matrix4().makeTranslation(-0.215, 1.18, -0.004);
+  const preparedFlexor = prepareDeformableMuscle({
+    geometry: flexorGeom,
+    worldMatrix: flexorWorld,
+    proximalBoneCloud: proxCloud,
+    distalBoneCloud: distCloud,
+    jointPivot: elbowPivot,
+    joint: 'elbow',
+  });
+
+  // Posterior extensor antagonist spanning behind the elbow (z=-0.052)
+  const extensorGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.24, 16, 16);
+  const extensorWorld = new THREE.Matrix4().makeTranslation(-0.215, 1.18, -0.052);
+  const preparedExtensor = prepareDeformableMuscle({
+    geometry: extensorGeom,
+    worldMatrix: extensorWorld,
+    proximalBoneCloud: proxCloud,
+    distalBoneCloud: distCloud,
+    jointPivot: elbowPivot,
+    joint: 'elbow',
+  });
+
+  const dynFlexor = flexorGeom.clone();
+  dynFlexor.setAttribute('position', new THREE.BufferAttribute(new Float32Array(preparedFlexor.restWorldPositions), 3));
+  const dynExtensor = extensorGeom.clone();
+  dynExtensor.setAttribute('position', new THREE.BufferAttribute(new Float32Array(preparedExtensor.restWorldPositions), 3));
+
+  const measureMidBellyCrossRadius = (geom: THREE.BufferGeometry, weights: Float32Array): number => {
+    const pos = geom.getAttribute('position');
+    let cx = 0, n = 0;
+    for (let i = 0; i < pos.count; i += 1) {
+      if (weights[i] >= 0.42 && weights[i] <= 0.58) {
+        cx += pos.getX(i);
+        n += 1;
+      }
+    }
+    cx /= n;
+    let sumX = 0;
+    for (let i = 0; i < pos.count; i += 1) {
+      if (weights[i] >= 0.42 && weights[i] <= 0.58) {
+        sumX += Math.abs(pos.getX(i) - cx);
+      }
+    }
+    return sumX / n;
+  };
+
+  const identityMat = new THREE.Matrix4().identity();
+  const restFlexorRes = deformMuscleGeometryInPlace({
+    prepared: preparedFlexor,
+    targetGeometry: dynFlexor,
+    proximalMatrix: identityMat,
+    distalMatrix: identityMat,
+    jointPivot: elbowPivot,
+  });
+  const restMidR = measureMidBellyCrossRadius(dynFlexor, preparedFlexor.weights);
+  assert.ok(Math.abs(restFlexorRes.stretchRatio - 1) < 1e-4);
+
+  // Rotate distal forearm -110° around X (elbow flexion) around elbowPivot
+  const distPivotGroup = new THREE.Group();
+  distPivotGroup.position.set(elbowPivot.x, elbowPivot.y, elbowPivot.z);
+  distPivotGroup.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), (-110 * Math.PI) / 180);
+  const distOffsetGroup = new THREE.Group();
+  distOffsetGroup.position.set(-elbowPivot.x, -elbowPivot.y, -elbowPivot.z);
+  distPivotGroup.add(distOffsetGroup);
+  distPivotGroup.updateMatrixWorld(true);
+
+  const flexedRes = deformMuscleGeometryInPlace({
+    prepared: preparedFlexor,
+    targetGeometry: dynFlexor,
+    proximalMatrix: identityMat,
+    distalMatrix: distOffsetGroup.matrixWorld,
+    jointPivot: elbowPivot,
+    bulgeGain: 1.15,
+  });
+  const flexedMidR = measureMidBellyCrossRadius(dynFlexor, preparedFlexor.weights);
+
+  assert.ok(flexedRes.stretchRatio < 0.85, `Expected flexor physical shortening < 0.85, got ${flexedRes.stretchRatio}`);
+  assert.ok(
+    Math.hypot(
+      flexedRes.ppWorld.x - preparedFlexor.ppRestWorld.x,
+      flexedRes.ppWorld.y - preparedFlexor.ppRestWorld.y,
+      flexedRes.ppWorld.z - preparedFlexor.ppRestWorld.z,
+    ) < 1e-6,
+    'Proximal PP must remain rigidly welded to proximal bone',
+  );
+  assert.ok(flexedMidR > restMidR * 1.04, `Expected isochoric radial swelling (${flexedMidR} > ${restMidR})`);
+
+  // Antagonist extensor stretches & slims during the exact same elbow flexion!
+  const restExtMidR = measureMidBellyCrossRadius(dynExtensor, preparedExtensor.weights);
+  const stretchedExtRes = deformMuscleGeometryInPlace({
+    prepared: preparedExtensor,
+    targetGeometry: dynExtensor,
+    proximalMatrix: identityMat,
+    distalMatrix: distOffsetGroup.matrixWorld,
+    jointPivot: elbowPivot,
+    bulgeGain: 0.85,
+  });
+  const stretchedExtMidR = measureMidBellyCrossRadius(dynExtensor, preparedExtensor.weights);
+  assert.ok(stretchedExtRes.stretchRatio > 1.1, `Expected antagonist lengthening > 1.1, got ${stretchedExtRes.stretchRatio}`);
+  assert.ok(stretchedExtMidR < restExtMidR * 0.98, `Expected physiological radial slimming on stretched antagonist`);
+
+  // Cutaneous facial muscle contraction pulls skin PK smoothly toward skull PP
+  const facialPrep = prepareDeformableMuscle({
+    geometry: flexorGeom,
+    worldMatrix: flexorWorld,
+    proximalBoneCloud: proxCloud,
+    distalBoneCloud: new Float32Array(0),
+    jointPivot: { x: 0, y: 1.57, z: 0.07 },
+    joint: 'facial',
+  });
+  const dynFacial = flexorGeom.clone();
+  dynFacial.setAttribute('position', new THREE.BufferAttribute(new Float32Array(facialPrep.restWorldPositions), 3));
+  const facialRes = deformMuscleGeometryInPlace({
+    prepared: facialPrep,
+    targetGeometry: dynFacial,
+    proximalMatrix: identityMat,
+    distalMatrix: identityMat,
+    jointPivot: { x: 0, y: 1.57, z: 0.07 },
+    facialContractionT: 1,
+  });
+  assert.ok(facialRes.stretchRatio < 0.8, `Expected facial contraction shortening < 0.8, got ${facialRes.stretchRatio}`);
+
+  // 3. Full 103-preset plane/axis/subpart audit across all 74 muscles
+  const allPresets = MUSCLE_ACTIONS_DB.flatMap((m) => m.kinematicPresets.map((p) => ({ m, p })));
+  assert.ok(allPresets.length >= 103, `Expected >= 103 kinematic presets across 74 muscles, got ${allPresets.length}`);
+  for (const { m, p } of allPresets) {
+    if (!p.translationMeters) {
+      if (p.planePl === 'Płaszczyzna strzałkowa') assert.equal(p.rotAxis, 'x', `${m.muscleId}/${p.id} sagittal must use X axis`);
+      if (p.planePl === 'Płaszczyzna czołowa') assert.equal(p.rotAxis, 'z', `${m.muscleId}/${p.id} frontal must use Z axis`);
+      if (p.planePl === 'Płaszczyzna poprzeczna') assert.equal(p.rotAxis, 'y', `${m.muscleId}/${p.id} transverse must use Y axis`);
+    }
+  }
+  for (const m of MUSCLE_ACTIONS_DB) {
+    const ids = new Set(m.kinematicPresets.map((k) => k.id));
+    for (const sub of m.subparts ?? []) {
+      if (sub.presetId) {
+        assert.equal(ids.has(sub.presetId), true, `Missing subpart presetId ${sub.presetId} on ${m.muscleId}`);
+      }
+    }
   }
 });
