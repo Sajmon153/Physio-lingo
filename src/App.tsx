@@ -67,11 +67,22 @@ import {
   restoreHeartsProgress,
   saveProgress,
 } from './utils/gameLogic';
-import { isStandalonePwaMode } from './services/pwaOfflineService';
+import {
+  INSTALL_PROMPT_DISMISSED_SESSION_KEY,
+  isStandalonePwaMode,
+  shouldAutoShowInstallModal,
+} from './services/pwaOfflineService';
+import { InstallAppPromptModal } from './components/InstallAppPromptModal';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+declare global {
+  interface Window {
+    __physioDeferredInstallPrompt?: BeforeInstallPromptEvent | null;
+  }
 }
 
 export default function App() {
@@ -85,8 +96,25 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(() =>
+      typeof window !== 'undefined' ? (window.__physioDeferredInstallPrompt ?? null) : null,
+    );
   const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(() => isStandalonePwaMode());
+  const [showInstallModal, setShowInstallModal] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    let dismissed = false;
+    try {
+      dismissed = window.sessionStorage.getItem(INSTALL_PROMPT_DISMISSED_SESSION_KEY) === '1';
+    } catch {
+      dismissed = false;
+    }
+    return shouldAutoShowInstallModal({
+      isStandalone: isStandalonePwaMode(),
+      search: window.location.search,
+      dismissedInSession: dismissed,
+    });
+  });
   const skipNextAccountSyncRef = useRef(false);
   const syncTimerRef = useRef<number | null>(null);
   const latestProgressRef = useRef(progress);
@@ -139,21 +167,34 @@ export default function App() {
     const handleOffline = () => setIsOnline(false);
     const handleBeforeInstall = (ev: Event) => {
       ev.preventDefault();
+      window.__physioDeferredInstallPrompt = ev as BeforeInstallPromptEvent;
       setDeferredInstallPrompt(ev as BeforeInstallPromptEvent);
     };
+    const handleEarlyPromptReady = () => {
+      if (window.__physioDeferredInstallPrompt) {
+        setDeferredInstallPrompt(window.__physioDeferredInstallPrompt);
+      }
+    };
     const handleAppInstalled = () => {
+      window.__physioDeferredInstallPrompt = null;
       setIsPwaInstalled(true);
       setDeferredInstallPrompt(null);
+      setShowInstallModal(false);
     };
+
+    // Sync if <head> captured beforeinstallprompt prior to React mount
+    handleEarlyPromptReady();
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('physio:install-ready', handleEarlyPromptReady);
     window.addEventListener('appinstalled', handleAppInstalled);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('physio:install-ready', handleEarlyPromptReady);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
@@ -163,14 +204,34 @@ export default function App() {
     setShowAccountModal(true);
   }, []);
 
+  const handleCloseInstallModal = useCallback(() => {
+    setShowInstallModal(false);
+    try {
+      window.sessionStorage.setItem(INSTALL_PROMPT_DISMISSED_SESSION_KEY, '1');
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('install') || url.searchParams.has('pobierz')) {
+        url.searchParams.delete('install');
+        url.searchParams.delete('pobierz');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      }
+    } catch {
+      // Ignore storage/history restrictions
+    }
+  }, []);
+
   const handleTriggerInstallPwa = useCallback(async () => {
-    if (!deferredInstallPrompt) return;
+    if (!deferredInstallPrompt) {
+      setShowInstallModal(true);
+      return;
+    }
     try {
       await deferredInstallPrompt.prompt();
       const choice = await deferredInstallPrompt.userChoice;
       if (choice.outcome === 'accepted') {
         setIsPwaInstalled(true);
+        setShowInstallModal(false);
       }
+      window.__physioDeferredInstallPrompt = null;
       setDeferredInstallPrompt(null);
     } catch {
       // Ignore user cancellation
@@ -611,8 +672,10 @@ export default function App() {
             authUser={authUser}
             syncStatus={syncStatus}
             isOnline={isOnline}
+            isPwaInstalled={isPwaInstalled}
             canInstallPwa={Boolean(deferredInstallPrompt && !isPwaInstalled)}
             onTriggerInstallPwa={handleTriggerInstallPwa}
+            onOpenInstallModal={() => setShowInstallModal(true)}
             onOpenOfflineManager={() => handleOpenAccountModal('offline')}
             onOpenAccountModal={() => handleOpenAccountModal('account')}
             onToggleTheme={handleToggleTheme}
@@ -768,6 +831,14 @@ export default function App() {
           onClose={() => setShowHeartsModal(false)}
         />
       )}
+
+      <InstallAppPromptModal
+        isOpen={showInstallModal && !isPwaInstalled}
+        canInstallNative={Boolean(deferredInstallPrompt && !isPwaInstalled)}
+        onTriggerNativeInstall={handleTriggerInstallPwa}
+        onOpenOfflinePacks={() => handleOpenAccountModal('offline')}
+        onClose={handleCloseInstallModal}
+      />
 
       {showAccountModal && (
         <Suspense fallback={null}>

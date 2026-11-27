@@ -6,7 +6,7 @@
  * dermatomes, biomechanics, and clinical cases without internet access.
  */
 
-export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v6';
+export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v7';
 export const PHYSIOLINGO_MODELS_CACHE = 'physiolingo-models-v6';
 
 export type OfflinePackId =
@@ -447,4 +447,113 @@ export async function removeOfflinePack(packId: OfflinePackId): Promise<void> {
 export async function clearOfflineModelCache(): Promise<void> {
   if (!isOfflineCacheSupported()) return;
   await caches.delete(PHYSIOLINGO_MODELS_CACHE);
+}
+
+// ============================================================================
+// IMMEDIATE APP DOWNLOAD / PWA INSTALL DETECTION & LINK HELPERS
+// ============================================================================
+
+export type InstallPlatformTab = 'mobile' | 'desktop';
+export type DetectedOsKind = 'android' | 'ios' | 'windows' | 'macos' | 'linux' | 'other';
+
+export interface InstallEnvironmentInfo {
+  isStandalone: boolean;
+  defaultTab: InstallPlatformTab;
+  os: DetectedOsKind;
+  /** True when opened inside Messenger, Instagram, Facebook, TikTok or similar WebView */
+  isInAppBrowser: boolean;
+  browser: 'chromium' | 'safari' | 'firefox' | 'other';
+}
+
+export const INSTALL_PROMPT_DISMISSED_SESSION_KEY = 'physiolingo_install_prompt_dismissed_v1';
+
+/**
+ * Detects OS, browser engine, Messenger/Instagram WebView, and ideal default tab ('mobile' vs 'desktop')
+ * so visitors opening a shared link immediately get tailored download instructions or 1-click install.
+ */
+export function detectInstallEnvironment(
+  userAgent?: string,
+  maxTouchPoints?: number,
+  standaloneOverride?: boolean,
+): InstallEnvironmentInfo {
+  const ua =
+    userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent || '' : '');
+  const touchPts =
+    maxTouchPoints ?? (typeof navigator !== 'undefined' ? navigator.maxTouchPoints || 0 : 0);
+  const isStandalone = standaloneOverride ?? isStandalonePwaMode();
+
+  const isInAppBrowser =
+    /\b(FBAN|FBAV|FB_IAB|Messenger|Instagram|BytedanceWebview|musical_ly|TikTok|Line\/|LinkedInApp)\b/i.test(
+      ua,
+    );
+
+  // iPadOS 13+ reports Macintosh in UA with maxTouchPoints > 1
+  const isIos =
+    /\b(iPhone|iPad|iPod)\b/i.test(ua) || (/Macintosh/i.test(ua) && touchPts > 1);
+  const isAndroid = /\bAndroid\b/i.test(ua);
+
+  let os: DetectedOsKind = 'other';
+  if (isIos) os = 'ios';
+  else if (isAndroid) os = 'android';
+  else if (/Windows/i.test(ua)) os = 'windows';
+  else if (/Macintosh|Mac OS X/i.test(ua)) os = 'macos';
+  else if (/Linux|CrOS/i.test(ua)) os = 'linux';
+
+  const defaultTab: InstallPlatformTab =
+    os === 'ios' || os === 'android' || /\bMobile\b/i.test(ua) ? 'mobile' : 'desktop';
+
+  let browser: InstallEnvironmentInfo['browser'] = 'other';
+  if (/Firefox|FxiOS/i.test(ua)) {
+    browser = 'firefox';
+  } else if (/Chrome|CriOS|Edg|OPR|SamsungBrowser|Brave/i.test(ua) && !isIos) {
+    browser = 'chromium';
+  } else if (/Safari/i.test(ua) && !/Chrome|CriOS|Edg|OPR|Android/i.test(ua)) {
+    browser = 'safari';
+  }
+
+  return {
+    isStandalone,
+    defaultTab,
+    os,
+    isInAppBrowser,
+    browser,
+  };
+}
+
+/**
+ * Decides whether the "Pobierz aplikację na telefon lub komputer" modal should open immediately on page load:
+ * - Never if already running as an installed standalone app
+ * - Always if the shared URL contains `?install=1` or `?pobierz=1`
+ * - Immediately on every fresh visit in a browser tab until dismissed in that session
+ */
+export function shouldAutoShowInstallModal(params: {
+  isStandalone: boolean;
+  search: string;
+  dismissedInSession: boolean;
+}): boolean {
+  if (params.isStandalone) return false;
+  const query = new URLSearchParams(params.search || '');
+  if (query.get('install') === '1' || query.get('pobierz') === '1') {
+    return true;
+  }
+  return !params.dismissedInSession;
+}
+
+/**
+ * Builds an Android `intent://` deep link that breaks out of Messenger/Instagram WebView directly into Google Chrome.
+ */
+export function buildAndroidChromeIntentUrl(currentHref: string): string {
+  try {
+    const parsed = new URL(currentHref);
+    parsed.searchParams.set('install', '1');
+    const hostAndPath = `${parsed.host}${parsed.pathname}${parsed.search}`;
+    return `intent://${hostAndPath}#Intent;scheme=${parsed.protocol.replace(':', '')};package=com.android.chrome;end`;
+  } catch {
+    return currentHref;
+  }
+}
+
+export function buildDirectInstallShareUrl(origin: string): string {
+  const clean = origin.replace(/\/+$/, '');
+  return `${clean}/?install=1`;
 }

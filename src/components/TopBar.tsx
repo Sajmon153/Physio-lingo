@@ -25,8 +25,10 @@ interface TopBarProps {
   authUser?: UserAccountPublic | null;
   syncStatus?: AccountSyncStatus;
   isOnline?: boolean;
+  isPwaInstalled?: boolean;
   canInstallPwa?: boolean;
   onTriggerInstallPwa?: () => void;
+  onOpenInstallModal?: () => void;
   onOpenOfflineManager?: () => void;
   onOpenAccountModal?: () => void;
   onToggleTheme: () => void;
@@ -55,8 +57,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   authUser = null,
   syncStatus = 'idle',
   isOnline = true,
+  isPwaInstalled = false,
   canInstallPwa = false,
   onTriggerInstallPwa,
+  onOpenInstallModal,
   onOpenOfflineManager,
   onOpenAccountModal,
   onToggleTheme,
@@ -151,17 +155,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
 
-          {/* Discreet PWA Install Trigger (shown when browser fires beforeinstallprompt) */}
-          {isOnline && canInstallPwa && onTriggerInstallPwa && (
+          {/* Always-visible Download/Install App Button when running in browser (!isPwaInstalled) */}
+          {!isPwaInstalled && (onOpenInstallModal || (canInstallPwa && onTriggerInstallPwa)) && (
             <button
               type="button"
               data-testid="topbar-install-pwa-btn"
-              onClick={onTriggerInstallPwa}
-              title="Zainstaluj PhysioLingo na urządzeniu jako aplikację PWA do nauki offline"
+              onClick={onOpenInstallModal ?? onTriggerInstallPwa}
+              title="Pobierz i zainstaluj PhysioLingo na telefonie lub komputerze"
               className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border-2 border-emerald-500 bg-emerald-50 px-2 py-1.5 text-xs font-extrabold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-950/70 dark:text-emerald-200"
             >
               <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Zainstaluj</span>
+              <span>Pobierz</span>
             </button>
           )}
 

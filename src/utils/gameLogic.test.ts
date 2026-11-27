@@ -108,10 +108,14 @@ import {
   restoreHeartsProgress,
 } from './gameLogic.ts';
 import {
+  buildAndroidChromeIntentUrl,
+  buildDirectInstallShareUrl,
   CORE_OFFLINE_3D_ASSETS,
+  detectInstallEnvironment,
   OFFLINE_MODEL_PACKS,
   PHYSIOLINGO_APP_CACHE,
   PHYSIOLINGO_MODELS_CACHE,
+  shouldAutoShowInstallModal,
   TOTAL_OFFLINE_3D_BYTES,
   TOTAL_OFFLINE_3D_FILES,
   formatBytesPl,
@@ -1931,4 +1935,54 @@ test('Phase 13 (v7.1): per-vertex 3D muscle mesh deformation, isochoric swelling
       }
     }
   }
+
+  // 4. Immediate shared-link Download / Install App detection & modal rules (phone, iPadOS, Messenger WebView, PC/Mac)
+  const androidMessenger = detectInstallEnvironment(
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/465.0.0.0]',
+    5,
+    false,
+  );
+  assert.equal(androidMessenger.os, 'android');
+  assert.equal(androidMessenger.defaultTab, 'mobile');
+  assert.equal(androidMessenger.isInAppBrowser, true);
+
+  const ipadSafari = detectInstallEnvironment(
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+    5,
+    false,
+  );
+  assert.equal(ipadSafari.os, 'ios');
+  assert.equal(ipadSafari.defaultTab, 'mobile');
+
+  const winDesktop = detectInstallEnvironment(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
+    0,
+    false,
+  );
+  assert.equal(winDesktop.os, 'windows');
+  assert.equal(winDesktop.defaultTab, 'desktop');
+  assert.equal(winDesktop.browser, 'chromium');
+
+  // Auto-show rules on shared link open
+  assert.equal(shouldAutoShowInstallModal({ isStandalone: false, search: '', dismissedInSession: false }), true);
+  assert.equal(shouldAutoShowInstallModal({ isStandalone: false, search: '', dismissedInSession: true }), false);
+  assert.equal(shouldAutoShowInstallModal({ isStandalone: false, search: '?install=1', dismissedInSession: true }), true);
+  assert.equal(shouldAutoShowInstallModal({ isStandalone: true, search: '?install=1', dismissedInSession: false }), false);
+
+  const intentUrl = buildAndroidChromeIntentUrl('https://physio-lingo.fizjolingo.workers.dev/');
+  assert.ok(intentUrl.startsWith('intent://physio-lingo.fizjolingo.workers.dev/?install=1#Intent;scheme=https;package=com.android.chrome;end'));
+  assert.equal(
+    buildDirectInstallShareUrl('https://physio-lingo.fizjolingo.workers.dev/'),
+    'https://physio-lingo.fizjolingo.workers.dev/?install=1',
+  );
+
+  const installModalSrc = fs.readFileSync(
+    path.resolve(process.cwd(), 'src/components/InstallAppPromptModal.tsx'),
+    'utf8',
+  );
+  assert.equal(
+    /\b(?:bg|text|border|ring|from|to|via)-(?:blue|sky|indigo|cyan|teal|slate)-\d{2,3}\b/.test(installModalSrc),
+    false,
+    'InstallAppPromptModal must not use forbidden blue/sky/indigo/cyan/teal/slate classes',
+  );
 });

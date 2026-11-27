@@ -25,6 +25,14 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#10b981" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b1510" media="(prefers-color-scheme: dark)" />
+    <script>
+      window.__physioDeferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__physioDeferredInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('physio:install-ready'));
+      });
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

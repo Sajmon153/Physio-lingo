@@ -10,15 +10,13 @@
  *  - Static assets (/assets/*, /favicon.svg, /manifest.webmanifest): STALE_WHILE_REVALIDATE
  */
 
-const APP_CACHE_NAME = 'physiolingo-app-v6';
+const APP_CACHE_NAME = 'physiolingo-app-v7';
 const MODELS_CACHE_NAME = 'physiolingo-models-v6';
 const ACTIVE_CACHES = [APP_CACHE_NAME, MODELS_CACHE_NAME];
 
-const CORE_PRECACHE_URLS = [
-  '/',
-  '/manifest.webmanifest',
-  '/favicon.svg',
-  '/icons/icon-192.png',
+const FAST_INSTALL_URLS = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons/icon-192.png'];
+
+const DEFERRED_WARMUP_URLS = [
   '/icons/icon-512.png',
   '/icons/icon-512-maskable.png',
   '/icons/apple-touch-icon.png',
@@ -34,7 +32,7 @@ self.addEventListener('install', (event) => {
       .open(APP_CACHE_NAME)
       .then((cache) =>
         Promise.allSettled(
-          CORE_PRECACHE_URLS.map((url) =>
+          FAST_INSTALL_URLS.map((url) =>
             fetch(url, { cache: 'no-cache' })
               .then((res) => {
                 if (res && res.ok) {
@@ -61,7 +59,23 @@ self.addEventListener('activate', (event) => {
             .map((key) => caches.delete(key)),
         ),
       )
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      .then(() => {
+        // Warm up Draco decoders & icons in background without delaying SW activation / beforeinstallprompt
+        caches.open(APP_CACHE_NAME).then((cache) => {
+          DEFERRED_WARMUP_URLS.forEach((url) => {
+            cache.match(url).then((existing) => {
+              if (!existing) {
+                fetch(url)
+                  .then((res) => {
+                    if (res && res.ok) cache.put(url, res.clone());
+                  })
+                  .catch(() => undefined);
+              }
+            });
+          });
+        });
+      }),
   );
 });
 
