@@ -103,7 +103,7 @@ interface RigRuntime {
   proximalOffset: THREE.Group;
   distalPivot: THREE.Group;
   distalOffset: THREE.Group;
-  distalParentedToScapula: boolean;
+  distalTracksGlenoid: boolean;
   scapulaPivot: THREE.Group;
   scapulaOffset: THREE.Group;
   scapulaPivotPos: Vec3Tuple;
@@ -265,26 +265,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
     rig.patellaPivot.quaternion.identity();
     rig.patellaPivot.position.set(rig.pivotPos.x, rig.pivotPos.y, rig.pivotPos.z);
 
-    // 2. Apply true 3D anatomical quaternion rotation & translation to the moving segment
-    const targetPivot =
-      frame.movingSegment === 'distal' ? rig.distalPivot : rig.proximalPivot;
-    const appliedQuat =
-      frame.movingSegment === 'distal' && rig.distalParentedToScapula
-        ? frame.glenohumeralQuaternion
-        : frame.quaternion;
-    targetPivot.quaternion.set(
-      appliedQuat.x,
-      appliedQuat.y,
-      appliedQuat.z,
-      appliedQuat.w,
-    );
-    targetPivot.position.set(
-      rig.pivotPos.x + frame.translationMeters.x,
-      rig.pivotPos.y + frame.translationMeters.y,
-      rig.pivotPos.z + frame.translationMeters.z,
-    );
-
-    // 3. Apply coupled scapulohumeral rhythm (2:1) & patellar tracking
+    // 2. Apply coupled scapulohumeral rhythm (2:1) & patellar tracking first so glenoid position is up to date
     if (frame.coupledScapulaDeg !== 0) {
       const scapAxis =
         frame.coupledScapulaAxis === 'x'
@@ -299,6 +280,36 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
       rig.patellaPivot.quaternion.setFromAxisAngle(
         new THREE.Vector3(1, 0, 0),
         (frame.coupledPatellaDeg * Math.PI) / 180,
+      );
+    }
+
+    // 3. Apply true 3D anatomical quaternion rotation & translation to the moving segment
+    // (When scapula co-rotates in open-chain shoulder motion, seat distalPivot directly on the rotated glenoid!)
+    const targetPivot =
+      frame.movingSegment === 'distal' ? rig.distalPivot : rig.proximalPivot;
+    targetPivot.quaternion.set(
+      frame.quaternion.x,
+      frame.quaternion.y,
+      frame.quaternion.z,
+      frame.quaternion.w,
+    );
+    if (frame.movingSegment === 'distal' && frame.coupledScapulaDeg !== 0 && rig.distalTracksGlenoid) {
+      rig.proximalPivot.updateMatrixWorld(true);
+      const liveGlenoid = new THREE.Vector3(
+        rig.pivotPos.x,
+        rig.pivotPos.y,
+        rig.pivotPos.z,
+      ).applyMatrix4(rig.scapulaOffset.matrixWorld);
+      targetPivot.position.set(
+        liveGlenoid.x + frame.translationMeters.x,
+        liveGlenoid.y + frame.translationMeters.y,
+        liveGlenoid.z + frame.translationMeters.z,
+      );
+    } else {
+      targetPivot.position.set(
+        rig.pivotPos.x + frame.translationMeters.x,
+        rig.pivotPos.y + frame.translationMeters.y,
+        rig.pivotPos.z + frame.translationMeters.z,
       );
     }
 
@@ -895,14 +906,10 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
           distalOffset.add(m);
         }
 
-        const distalParentedToScapula =
+        const distalTracksGlenoid =
           activePreset.joint === 'shoulder' && scapulaClones.length > 0;
         root.add(proximalPivot);
-        if (distalParentedToScapula) {
-          scapulaOffset.add(distalPivot);
-        } else {
-          root.add(distalPivot);
-        }
+        root.add(distalPivot);
 
         // Sample proximal & distal bone surface point clouds ONCE for automatic PP/PK tendon binding
         const proximalBoneCloud = sampleBoneSurfacePoints(proximalClones, 420);
@@ -1007,15 +1014,6 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
         // (quadriceps, triceps, masseter, temporalis, latissimus) bulge physiologically at peak contraction!
         {
           const startFrame = evaluateKinematicFrame(activePreset, 0, 'concentric', boneBoxes);
-          const initQuat = distalParentedToScapula
-            ? startFrame.glenohumeralQuaternion
-            : startFrame.quaternion;
-          distalPivot.quaternion.set(initQuat.x, initQuat.y, initQuat.z, initQuat.w);
-          distalPivot.position.set(
-            pivotPos.x + startFrame.translationMeters.x,
-            pivotPos.y + startFrame.translationMeters.y,
-            pivotPos.z + startFrame.translationMeters.z,
-          );
           if (startFrame.coupledScapulaDeg !== 0) {
             const scapAx =
               startFrame.coupledScapulaAxis === 'x'
@@ -1024,6 +1022,31 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
             scapulaPivot.quaternion.setFromAxisAngle(
               scapAx,
               (startFrame.coupledScapulaDeg * Math.PI) / 180,
+            );
+          }
+          distalPivot.quaternion.set(
+            startFrame.quaternion.x,
+            startFrame.quaternion.y,
+            startFrame.quaternion.z,
+            startFrame.quaternion.w,
+          );
+          if (startFrame.coupledScapulaDeg !== 0 && distalTracksGlenoid) {
+            proximalPivot.updateMatrixWorld(true);
+            const liveGlenoid = new THREE.Vector3(
+              pivotPos.x,
+              pivotPos.y,
+              pivotPos.z,
+            ).applyMatrix4(scapulaOffset.matrixWorld);
+            distalPivot.position.set(
+              liveGlenoid.x + startFrame.translationMeters.x,
+              liveGlenoid.y + startFrame.translationMeters.y,
+              liveGlenoid.z + startFrame.translationMeters.z,
+            );
+          } else {
+            distalPivot.position.set(
+              pivotPos.x + startFrame.translationMeters.x,
+              pivotPos.y + startFrame.translationMeters.y,
+              pivotPos.z + startFrame.translationMeters.z,
             );
           }
           root.updateMatrixWorld(true);
@@ -1188,7 +1211,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
           proximalOffset,
           distalPivot,
           distalOffset,
-          distalParentedToScapula,
+          distalTracksGlenoid,
           scapulaPivot,
           scapulaOffset,
           scapulaPivotPos,

@@ -97,7 +97,7 @@ export const JOINT_MOVEMENT_CATALOG: JointMovementOption[] = [
   { joint: 'thoracolumbar_spine', jointLabelPl: 'Kręgosłup piersiowo-lędźwiowy', movementKey: 'pelvic_elevation', movementLabelPl: 'Unoszenie miednicy (hip hiking)', planePl: 'Płaszczyzna czołowa', sftrNormPl: 'Łańcuch zamknięty / chód' },
   { joint: 'thoracolumbar_spine', jointLabelPl: 'Kręgosłup piersiowo-lędźwiowy', movementKey: 'core_stabilization', movementLabelPl: 'Głęboka stabilizacja centralna (IAP)', planePl: 'Płaszczyzna poprzeczna', sftrNormPl: 'Cylinder stabilizacyjny tułowia' },
   { joint: 'ribcage_diaphragm', jointLabelPl: 'Klatka piersiowa i oddychanie', movementKey: 'inspiration', movementLabelPl: 'Wdech (główny i pomocniczy)', planePl: 'Płaszczyzna skośna / złożona', sftrNormPl: 'Obniżenie przepony + unoszenie żeber' },
-  { joint: 'ribcage_diaphragm', jointLabelPl: 'Klatka piersiowa i oddychanie', movementKey: 'forced_expiration', movementLabelPl: 'Forsowny wydech i tłocznia brzuszna', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: 'Kaszel, śpiew, stabilizacja' },
+  { joint: 'ribcage_diaphragm', jointLabelPl: 'Klatka piersiowa i oddychanie', movementKey: 'forced_expiration', movementLabelPl: 'Forsowny wydech i tłocznia brzuszna', planePl: 'Płaszczyzna skośna / złożona', sftrNormPl: 'Kaszel, śpiew, stabilizacja' },
 
   // Kręgosłup szyjny, SSŻ, mimika
   { joint: 'cervical_spine', jointLabelPl: 'Kręgosłup szyjny', movementKey: 'cervical_flexion', movementLabelPl: 'Zgięcie odcinka szyjnego', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: 'S 0-0-45°' },
@@ -107,7 +107,7 @@ export const JOINT_MOVEMENT_CATALOG: JointMovementOption[] = [
   { joint: 'tmj', jointLabelPl: 'Staw skroniowo-żuchwowy (SSŻ)', movementKey: 'jaw_elevation', movementLabelPl: 'Unoszenie żuchwy (zwieranie szczęk)', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: 'Zamknięcie z 40–50 mm → 0 mm' },
   { joint: 'tmj', jointLabelPl: 'Staw skroniowo-żuchwowy (SSŻ)', movementKey: 'jaw_protrusion', movementLabelPl: 'Protruzja (wysuwanie) żuchwy', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: '6–10 mm w przód' },
   { joint: 'tmj', jointLabelPl: 'Staw skroniowo-żuchwowy (SSŻ)', movementKey: 'jaw_retrusion', movementLabelPl: 'Retruzja (cofanie) żuchwy', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: '2–4 mm w tył' },
-  { joint: 'facial', jointLabelPl: 'Mimika twarzy', movementKey: 'facial_nose_expression', movementLabelPl: 'Ruchy skrzydeł nosa i górnej wargi', planePl: 'Płaszczyzna poprzeczna', sftrNormPl: 'Mimika oddechowa (n. VII)' },
+  { joint: 'facial', jointLabelPl: 'Mimika twarzy', movementKey: 'facial_nose_expression', movementLabelPl: 'Ruchy skrzydeł nosa i górnej wargi', planePl: 'Płaszczyzna skośna / złożona', sftrNormPl: 'Mimika oddechowa (n. VII)' },
   { joint: 'facial', jointLabelPl: 'Mimika twarzy', movementKey: 'facial_brow_expression', movementLabelPl: 'Obniżanie gładzizny i brwi', planePl: 'Płaszczyzna strzałkowa', sftrNormPl: 'Ekspresja górnego piętra (n. VII)' },
 
   // Biodro
