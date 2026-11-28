@@ -805,17 +805,18 @@ export function buildBiomechanicsQuizQuestions(
         ),
       ).slice(0, 3);
 
+      const fmtLt = (lt?: string) => (lt ? lt.split(',')[0].trim().replace(/^./, (c) => c.toUpperCase()) : undefined);
       const options = shuffle([
         {
           id: primaryAntagonistId,
           label: primaryAntagonist?.namePl ?? primaryAntagonistId,
-          subtitle: primaryAntagonist?.nameEn,
+          subtitle: fmtLt(primaryAntagonist?.nameLt),
           isCorrect: true,
         },
         ...distractors.map((id) => ({
           id,
           label: ANATOMY_MAP[id]?.namePl ?? id,
-          subtitle: ANATOMY_MAP[id]?.nameEn,
+          subtitle: fmtLt(ANATOMY_MAP[id]?.nameLt),
           isCorrect: false,
         })),
       ]);

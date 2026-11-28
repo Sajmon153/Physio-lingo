@@ -77,13 +77,22 @@ import {
   getSrsDeckStats,
 } from './srsLogic.ts';
 import {
+  ANATOMY_LAYERS_META,
+  applyMuscleMyotendinousVertexColors,
+  buildSynthesizedAnatomicalTendons,
   classifyBaseGlbMeshLayer,
   createDefaultLayerVisibility,
   createMaterialForLayer,
+  formatMuscleSubpartLatin,
   formatMuscleSubpartPolish,
   getUnifiedMeshGroupKey,
+  isRaycastHitOnTendinousPart,
 } from '../three/anatomyLayers.ts';
-import { translateMeshNameToPolish } from './anatomyTranslator.ts';
+import {
+  capitalizeLatinTerm,
+  formatPolishLatinName,
+  translateMeshNameToPolish,
+} from './anatomyTranslator.ts';
 import {
   buildJsDelivrUrl,
   extractGlbModelsFromTree,
@@ -796,27 +805,32 @@ test('Phase 6: extended anatomical systems (arteries, veins, nerves, organs, bur
   assert.equal(getUnifiedMeshGroupKey('Sartorius muscle', 'm_sartorius', 'muscle', -0.2), null);
   assert.equal(getUnifiedMeshGroupKey('Biceps brachii muscle', 'm_biceps_brachii', 'muscle', -0.2, 'parts'), null);
 
-  // 3. White PBR materials for bursae, tendons, and ligaments + distinct system colors + default skin OFF
+  // 3. 12-tissue Atlas Pro PBR materials for bursae, tendons, sheaths, ligaments + distinct system colors + default skin OFF
   const bursaMat = createMaterialForLayer('bursa', 'Subacromial bursa') as THREE.MeshPhysicalMaterial;
-  const tendonMat = createMaterialForLayer('tendon', 'Common flexor tendon sheath') as THREE.MeshStandardMaterial;
+  const tendonMat = createMaterialForLayer('tendon', 'Palmar aponeurosis') as THREE.MeshPhysicalMaterial;
+  const sheathMat = createMaterialForLayer('sheath', 'Common flexor tendon sheath') as THREE.MeshPhysicalMaterial;
   const ligMat = createMaterialForLayer('ligament', 'Iliofemoral ligament.r') as THREE.MeshStandardMaterial;
   const artMat = createMaterialForLayer('artery', 'Brachial artery.r') as THREE.MeshStandardMaterial;
   const veinMat = createMaterialForLayer('vein', 'Great saphenous vein.r') as THREE.MeshStandardMaterial;
   const nerveMat = createMaterialForLayer('nerve', 'Sciatic nerve.r') as THREE.MeshStandardMaterial;
   const skinMat = createMaterialForLayer('skin', 'Deltoid region.r', undefined, 0.3) as THREE.MeshPhysicalMaterial;
 
-  assert.equal(bursaMat.color.getHex(), 0xf4f8fb);
-  assert.equal(tendonMat.color.getHex(), 0xf7f6f2);
-  assert.equal(ligMat.color.getHex(), 0xe6edf2);
-  assert.equal(artMat.color.getHex(), 0xdc2626);
+  assert.equal(bursaMat.color.getHex(), 0xb794f4);
+  assert.equal(tendonMat.color.getHex(), 0xf6f3e8);
+  assert.equal(sheathMat.color.getHex(), 0x4fc3d9);
+  assert.equal(ligMat.color.getHex(), 0xd4af5a);
+  assert.equal(artMat.color.getHex(), 0xe11d48);
   assert.equal(veinMat.color.getHex(), 0x2563eb);
-  assert.equal(nerveMat.color.getHex(), 0xeab308);
+  assert.equal(nerveMat.color.getHex(), 0xfacc15);
   assert.equal(skinMat.transparent, true);
   assert.ok(Math.abs(skinMat.opacity - 0.3) < 0.01);
 
   assert.equal(classifyBaseGlbMeshLayer('Subacromial bursa.001', '', 'mat_muscle_pro', false), 'bursa');
-  assert.equal(classifyBaseGlbMeshLayer('Intertubercular tendon sheath.001', '', 'mat_muscle_pro', false), 'tendon');
+  assert.equal(classifyBaseGlbMeshLayer('Intertubercular tendon sheath.001', '', 'mat_muscle_pro', false), 'sheath');
+  assert.equal(classifyBaseGlbMeshLayer('Palmar aponeurosis', '', 'mat_muscle_pro', false), 'tendon');
+  assert.equal(classifyBaseGlbMeshLayer('Groove for tendon of flexor hallucis longus', 'bone', 'mat_bone_pro', false), 'bone');
   const defaults = createDefaultLayerVisibility(true);
+  assert.equal(defaults.sheath, true);
   assert.equal(defaults.artery, true);
   assert.equal(defaults.vein, true);
   assert.equal(defaults.nerve, true);
@@ -1996,4 +2010,157 @@ test('Phase 13 (v7.1): per-vertex 3D muscle mesh deformation, isochoric swelling
     false,
     'InstallAppPromptModal must not use forbidden blue/sky/indigo/cyan/teal/slate classes',
   );
+});
+
+test('Phase 14 (v8.0): 12 distinct tissue colors, myotendinous vertex shading, synthesized 3D tendons & 0/2865 English leaks across 45 GLBs', () => {
+  // 1. Verify all 12 tissue layers exist with mutually distinct, non-colliding swatch colors
+  assert.equal(ANATOMY_LAYERS_META.length, 12);
+  const swatchHexes = ANATOMY_LAYERS_META.map((l) => l.swatchHex.toLowerCase());
+  assert.equal(new Set(swatchHexes).size, 12, 'All 12 tissue layers must have unique swatch hexes');
+
+  const parseRgb = (hex: string) => {
+    const clean = hex.replace('#', '');
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16),
+    ];
+  };
+  const connectiveIds = ['bone', 'cartilage', 'tendon', 'sheath', 'ligament', 'bursa'] as const;
+  for (let i = 0; i < connectiveIds.length; i++) {
+    for (let j = i + 1; j < connectiveIds.length; j++) {
+      const a = ANATOMY_LAYERS_META.find((l) => l.id === connectiveIds[i])!;
+      const b = ANATOMY_LAYERS_META.find((l) => l.id === connectiveIds[j])!;
+      const [ar, ag, ab] = parseRgb(a.swatchHex);
+      const [br, bg, bb] = parseRgb(b.swatchHex);
+      const dist = Math.hypot(ar - br, ag - bg, ab - bb);
+      assert.ok(
+        dist >= 28,
+        `Connective tissue layers ${a.id} (${a.swatchHex}) and ${b.id} (${b.swatchHex}) are too similar: RGB dist=${dist.toFixed(1)}`,
+      );
+    }
+  }
+
+  // 2. Verify per-vertex myotendinous shading (crimson belly <-> pearly tendinous poles) & tendinous raycast detection
+  const muscleCyl = new THREE.CylinderGeometry(0.022, 0.006, 0.28, 12, 24);
+  applyMuscleMyotendinousVertexColors(muscleCyl, 'Flexor carpi radialis muscle.r', 0);
+  const colAttr = muscleCyl.getAttribute('color');
+  const posAttr = muscleCyl.getAttribute('position');
+  assert.ok(colAttr, 'Muscle geometry must receive COLOR_0 vertex color attribute');
+  assert.ok(muscleCyl.userData.tendonWeights instanceof Float32Array, 'tendonWeights must be stored on geometry.userData');
+
+  let bellyIdx = -1;
+  let tendonIdx = -1;
+  for (let i = 0; i < posAttr.count; i++) {
+    const y = posAttr.getY(i);
+    if (Math.abs(y) < 0.015 && bellyIdx === -1) bellyIdx = i;
+    if (y < -0.13 && tendonIdx === -1) tendonIdx = i;
+  }
+  assert.ok(bellyIdx >= 0 && tendonIdx >= 0);
+  assert.ok(
+    colAttr.getX(bellyIdx) > 0.4 && colAttr.getY(bellyIdx) < 0.15,
+    `Mid-belly vertex must be linear crimson, got RGB=(${colAttr.getX(bellyIdx).toFixed(2)}, ${colAttr.getY(bellyIdx).toFixed(2)}, ${colAttr.getZ(bellyIdx).toFixed(2)})`,
+  );
+  assert.ok(
+    colAttr.getX(tendonIdx) > 0.82 && colAttr.getY(tendonIdx) > 0.8 && colAttr.getZ(tendonIdx) > 0.72,
+    `Tendon pole vertex must be linear pearly white, got RGB=(${colAttr.getX(tendonIdx).toFixed(2)}, ${colAttr.getY(tendonIdx).toFixed(2)}, ${colAttr.getZ(tendonIdx).toFixed(2)})`,
+  );
+  const dummyMesh = new THREE.Mesh(muscleCyl);
+  assert.equal(
+    isRaycastHitOnTendinousPart(dummyMesh, { a: tendonIdx, b: tendonIdx, c: tendonIdx, normal: new THREE.Vector3(), materialIndex: 0 }),
+    true,
+  );
+  assert.equal(
+    isRaycastHitOnTendinousPart(dummyMesh, { a: bellyIdx, b: bellyIdx, c: bellyIdx, normal: new THREE.Vector3(), materialIndex: 0 }),
+    false,
+  );
+
+  // 3. Verify sculpted 3D synthesized tendons (Achilles, Quadriceps tendon, Patellar ligament, Iliotibial tract)
+  const limbGroup = new THREE.Group();
+  const addMockPart = (name: string, x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
+    const g = new THREE.BoxGeometry(sx, sy, sz);
+    g.translate(x, y, z);
+    const m = new THREE.Mesh(g);
+    m.name = name;
+    limbGroup.add(m);
+  };
+  addMockPart('Calcaneus.r', -0.09, 0.03, -0.04, 0.04, 0.04, 0.07);
+  addMockPart('Soleus muscle.r', -0.09, 0.25, -0.03, 0.06, 0.22, 0.05);
+  addMockPart('Gastrocnemius lateral head.r', -0.1, 0.34, -0.04, 0.06, 0.22, 0.05);
+  addMockPart('Patella.r', -0.09, 0.48, 0.04, 0.04, 0.04, 0.02);
+  addMockPart('Rectus femoris muscle.r', -0.09, 0.68, 0.03, 0.06, 0.28, 0.05);
+  addMockPart('Vastus lateralis muscle.r', -0.12, 0.64, 0.01, 0.06, 0.28, 0.06);
+  addMockPart('Tibia.r', -0.09, 0.26, 0.01, 0.06, 0.36, 0.05);
+  limbGroup.updateMatrixWorld(true);
+
+  const synth = buildSynthesizedAnatomicalTendons(limbGroup);
+  const synthIds = new Set(synth.map((s) => s.structureId));
+  assert.equal(synthIds.has('achilles_tendon'), true);
+  assert.equal(synthIds.has('tendon_quadriceps'), true);
+  assert.equal(synthIds.has('lig_patellae'), true);
+  assert.equal(synthIds.has('tractus_iliotibialis'), true);
+
+  // 4. Verify 100% Polish + Terminologia Anatomica Latin across all 45 GLB files (0 verbatim English leaks!)
+  assert.equal(capitalizeLatinTerm('musculus supraspinatus'), 'Musculus supraspinatus');
+  assert.equal(
+    formatPolishLatinName('Mięsień nadgrzebieniowy', 'musculus supraspinatus'),
+    'Mięsień nadgrzebieniowy (Musculus supraspinatus)',
+  );
+  assert.equal(formatMuscleSubpartLatin('Acromial part of deltoid muscle.r'), 'pars acromialis');
+
+  const glbFiles: string[] = [];
+  const walkGlbs = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkGlbs(full);
+      else if (entry.name.endsWith('.glb')) glbFiles.push(full);
+    }
+  };
+  walkGlbs(path.resolve(process.cwd(), 'public/models'));
+  assert.ok(glbFiles.length >= 45, `Expected 45 GLB files, found ${glbFiles.length}`);
+
+  const englishInPolishLeakRe =
+    /\b(muscle|muscles|bone|bones|ligament|ligaments|tendon|tendons|bursa|bursae|sheath|sheaths|artery|arteries|vein|veins|nerve|nerves|joint|joints|cartilage|process|tubercle|tuberosity|groove|sulcus|gyrus|lobe|fissure|surface|border|head|neck|body|branch|root|trunk|ganglion|gland|duct|valve|ventricle|atrium|sinus|fascia|retinaculum|membrane|capsule|anterior|posterior|superior|inferior|medial|lateral|superficial|deep|internal|external|right|left|upper|lower|middle)\b/i;
+  // Purely-English words that are NEVER valid Latin Terminologia Anatomica words inside bilingualName's Latin parenthetical:
+  const pureEnglishNonLatinRe =
+    /\b(muscle|muscles|bone|bones|ligament|ligaments|tendon|tendons|sheath|sheaths|artery|arteries|vein|veins|nerve|nerves|joint|joints|cartilage|process|tubercle|tuberosity|groove|lobe|fissure|surface|border|head|neck|body|branch|root|trunk|gland|duct|valve|ventricle|membrane|capsule|medial|lateral|superficial|deep|internal|external|right|left|upper|lower|middle)\b/i;
+
+  let totalMeshNodesChecked = 0;
+  for (const file of glbFiles) {
+    const buf = fs.readFileSync(file);
+    const jsonLen = buf.readUInt32LE(12);
+    const gltf = JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf8')) as {
+      nodes?: Array<{ name?: string; mesh?: number }>;
+    };
+    const rel = path.relative(path.resolve(process.cwd(), 'public/models'), file);
+    const hint = rel.includes('arteries')
+      ? 'artery'
+      : rel.includes('veins')
+        ? 'vein'
+        : rel.includes('nerves')
+          ? 'nerve'
+          : rel.includes('ligaments')
+            ? 'ligament'
+            : rel.includes('organs')
+              ? 'organ'
+              : rel.includes('skin')
+                ? 'skin'
+                : 'other';
+    for (const n of gltf.nodes ?? []) {
+      if (n.mesh === undefined || !n.name) continue;
+      totalMeshNodesChecked += 1;
+      const tr = translateMeshNameToPolish(n.name, hint, -0.08);
+      assert.equal(
+        englishInPolishLeakRe.test(tr.namePl),
+        false,
+        `English token leaked in namePl for "${n.name}" (${rel}) -> "${tr.namePl}"`,
+      );
+      assert.equal(
+        pureEnglishNonLatinRe.test(tr.bilingualName),
+        false,
+        `English token leaked in bilingualName for "${n.name}" (${rel}) -> "${tr.bilingualName}"`,
+      );
+    }
+  }
+  assert.ok(totalMeshNodesChecked >= 2800, `Expected >=2800 GLB mesh nodes audited, got ${totalMeshNodesChecked}`);
 });

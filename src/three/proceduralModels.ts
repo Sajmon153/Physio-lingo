@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ANATOMY_MAP } from '../data/anatomyDb';
 import { RegionId, StructureCategory } from '../types/anatomy';
-import { formatBilingualName } from './anatomyTranslator';
+import { capitalizeLatinTerm, formatBilingualName } from './anatomyTranslator';
 
 export interface SelectableMeshMeta {
   id: string;
   namePl: string;
+  nameLt?: string;
   nameEn: string;
   bilingualName: string;
   structureId?: string;
@@ -337,11 +338,13 @@ function registerPart(
 ) {
   const entry = ANATOMY_MAP[structureId];
   const namePl = entry?.namePl ?? partId;
+  const nameLt = capitalizeLatinTerm(entry?.nameLt) || namePl;
   const nameEn = entry?.nameEn ?? entry?.nameLt ?? partId;
-  const bilingualName = formatBilingualName(namePl, nameEn);
+  const bilingualName = formatBilingualName(namePl, nameLt);
   const meta: SelectableMeshMeta = {
     id: partId,
     namePl,
+    nameLt,
     nameEn,
     bilingualName,
     structureId,
@@ -355,6 +358,7 @@ function registerPart(
     mesh.userData = {
       id: meta.id,
       namePl: meta.namePl,
+      nameLt: meta.nameLt,
       nameEn: meta.nameEn,
       bilingualName: meta.bilingualName,
       structureId: meta.structureId,

@@ -16,7 +16,7 @@ import {
   type ClinicalTestCategory,
   type ClinicalTestEntry,
 } from '../data/clinicalTestsDb';
-import { formatBilingualName } from '../three/anatomyTranslator';
+import { capitalizeLatinTerm, formatBilingualName } from '../three/anatomyTranslator';
 import { getStructureDetailLabels, normalizeAnatomyAnswer } from '../utils/gameLogic';
 
 type AtlasMainTab = 'structures' | 'orthopedic' | 'kinesitherapy';
@@ -97,7 +97,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
         const directHaystack = [
           item.namePl,
           item.nameEn ?? '',
-          formatBilingualName(item.namePl, item.nameEn),
+          formatBilingualName(item.namePl, item.nameLt),
           item.nameLt ?? '',
           ...item.aliases,
           item.pp,
@@ -321,7 +321,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
               onChange={(e) => setQuery(e.target.value)}
               placeholder={
                 activeTab === 'structures'
-                  ? 'Szukaj po polsku, angielsku (np. humerus), łacinie (np. supraspinatus), przyczepach, nerwach lub tętnicach...'
+                  ? 'Szukaj po polsku lub po łacinie (np. humerus, musculus supraspinatus, tendo calcaneus), przyczepach, nerwach lub tętnicach...'
                   : activeTab === 'orthopedic'
                     ? 'Szukaj testu (np. Lachman, Neer, Spurling, Phalen), struktury lub objawu dodatniego...'
                     : 'Szukaj w kinezyterapii (np. Thomas, Schober, Lovett, UGUL, PNF, SFTR, przykurcz)...'
@@ -459,7 +459,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                   <tbody className="divide-y divide-[#e6f0ea] dark:divide-[#233d2f]">
                     {structureResults.map((item) => {
                       const mistakes = mistakeStats[item.id]?.wrongCount ?? 0;
-                      const labels = getStructureDetailLabels(item.category);
+                      const labels = getStructureDetailLabels(item.category, item.id);
                       return (
                         <tr
                           key={item.id}
@@ -468,11 +468,11 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                         >
                           <td className="px-4 py-3.5 align-top">
                             <div className="font-display font-bold text-emerald-950 dark:text-white">
-                              {formatBilingualName(item.namePl, item.nameEn)}
+                              {item.namePl}
                             </div>
                             {item.nameLt && (
-                              <div className="text-xs italic text-[#52695b] dark:text-[#94b0a0]">
-                                {item.nameLt}
+                              <div className="text-xs italic font-semibold text-emerald-700 dark:text-emerald-300">
+                                {capitalizeLatinTerm(item.nameLt)}
                               </div>
                             )}
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -553,7 +553,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
             {/* Mobile Cards */}
             <div className={`space-y-3 ${deviceMode === 'phone' ? 'block' : 'md:hidden'}`}>
               {structureResults.map((item) => {
-                const labels = getStructureDetailLabels(item.category);
+                const labels = getStructureDetailLabels(item.category, item.id);
                 return (
                   <button
                     key={item.id}
@@ -564,11 +564,11 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="font-display text-base font-bold text-emerald-950 dark:text-white">
-                          {formatBilingualName(item.namePl, item.nameEn)}
+                          {item.namePl}
                         </div>
                         {item.nameLt && (
-                          <div className="text-xs italic text-[#52695b] dark:text-[#94b0a0]">
-                            {item.nameLt}
+                          <div className="text-xs italic font-semibold text-emerald-700 dark:text-emerald-300">
+                            {capitalizeLatinTerm(item.nameLt)}
                           </div>
                         )}
                         <div className="mt-1 text-[11px] font-semibold text-[#52695b] dark:text-[#94b0a0]">
@@ -634,11 +634,8 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                     <h2 className="mt-2 font-display text-lg font-extrabold text-emerald-950 dark:text-white">
                       {test.namePl}
                     </h2>
-                    <div className="text-xs font-medium text-[#52695b] dark:text-[#94b0a0]">
-                      {test.nameEn}
-                    </div>
 
-                    <p className="mt-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                    <p className="mt-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                       {test.targetSummary}
                     </p>
 
@@ -724,11 +721,11 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                     {REGION_LABELS[selectedItem.region]} • {CATEGORY_LABELS[selectedItem.category]}
                   </div>
                   <h2 className="mt-1 font-display text-2xl font-extrabold text-emerald-950 dark:text-white">
-                    {formatBilingualName(selectedItem.namePl, selectedItem.nameEn)}
+                    {selectedItem.namePl}
                   </h2>
                   {selectedItem.nameLt && (
-                    <div className="mt-0.5 text-sm italic font-medium text-[#52695b] dark:text-[#94b0a0]">
-                      łac. – {selectedItem.nameLt}
+                    <div className="mt-0.5 text-sm italic font-semibold text-emerald-700 dark:text-emerald-300">
+                      {capitalizeLatinTerm(selectedItem.nameLt)}
                     </div>
                   )}
                   {onShowIn3D && (
@@ -759,7 +756,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
 
               <div className="mt-5 space-y-3 text-sm leading-relaxed">
                 {(() => {
-                  const modalLabels = getStructureDetailLabels(selectedItem.category);
+                  const modalLabels = getStructureDetailLabels(selectedItem.category, selectedItem.id);
                   return (
                     <>
                       <div className="rounded-2xl bg-[#f4faf6] p-3.5 dark:bg-[#182b21]/70">
@@ -853,9 +850,6 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                   <h2 className="mt-1 font-display text-2xl font-extrabold text-emerald-950 dark:text-white">
                     {selectedTest.namePl}
                   </h2>
-                  <div className="mt-0.5 text-sm font-medium text-[#52695b] dark:text-[#94b0a0]">
-                    {selectedTest.nameEn}
-                  </div>
                 </div>
 
                 <button
@@ -1012,7 +1006,7 @@ export const AtlasDictionary: React.FC<AtlasDictionaryProps> = React.memo(
                               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-900 transition hover:bg-emerald-50 dark:border-emerald-700 dark:bg-[#112018] dark:text-emerald-200 dark:hover:bg-emerald-950/60"
                             >
                               <Box className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span>{formatBilingualName(s.namePl, s.nameEn)}</span>
+                              <span>{formatBilingualName(s.namePl, s.nameLt)}</span>
                             </button>
                           );
                         })}

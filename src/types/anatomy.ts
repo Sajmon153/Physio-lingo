@@ -24,9 +24,10 @@ export type AnatomicalLayerId =
   | 'bone'
   | 'cartilage'
   | 'muscle'
-  | 'bursa'
   | 'tendon'
+  | 'sheath'
   | 'ligament'
+  | 'bursa'
   | 'artery'
   | 'vein'
   | 'nerve'
@@ -116,6 +117,7 @@ export interface BonyLandmarkHotspot {
   id: string;
   boneId: string;
   namePl: string;
+  nameLt?: string;
   nameEn?: string;
   bilingualName: string;
   type: 'landmark' | 'pp' | 'pk';

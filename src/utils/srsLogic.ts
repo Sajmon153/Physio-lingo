@@ -3,7 +3,7 @@ import { BIOMECHANICS_MOVEMENTS } from '../data/biomechanicsDb';
 import { CLINICAL_TESTS_DB, type ClinicalTestCategory } from '../data/clinicalTestsDb';
 import { DERMATOME_MYOTOME_LEVELS } from '../data/dermatomesMyotomes';
 import { MUSCLE_ACTIONS_DB } from '../data/muscleActionsDb';
-import { formatBilingualName } from '../three/anatomyTranslator';
+import { capitalizeLatinTerm, formatBilingualName } from '../three/anatomyTranslator';
 import { RegionId, SrsCardState } from '../types/anatomy';
 import { getLocalDateKey, getStructureDetailLabels } from './gameLogic';
 
@@ -188,13 +188,14 @@ export function getAllSrsCards(): SrsFlashcard[] {
       tone: 'neutral',
     });
 
+    const lt = capitalizeLatinTerm(item.nameLt);
     return {
       id: `srs_anat_${item.id}`,
       deck: 'anatomy',
       badge,
       region: item.region,
-      frontTitle: formatBilingualName(item.namePl, item.nameEn),
-      frontSubtitle: item.nameEn,
+      frontTitle: formatBilingualName(item.namePl, lt),
+      frontSubtitle: lt || undefined,
       frontPrompt,
       backSections: sections,
       targetStructureId: item.id,
@@ -266,7 +267,12 @@ export function getAllSrsCards(): SrsFlashcard[] {
       badge: getClinicalBadge(test.category),
       region: test.region,
       frontTitle: test.namePl,
-      frontSubtitle: test.nameEn,
+      frontSubtitle:
+        test.category === 'orthopedic'
+          ? 'Test ortopedyczny i prowokacyjny'
+          : test.category === 'lovett'
+            ? 'Test siły mięśniowej wg Lovetta (0–5)'
+            : 'Kinezyterapia i terapia manualna',
       frontPrompt: getClinicalPrompt(test.category),
       backSections: sections,
       targetStructureId: test.structureIds[0],
@@ -409,7 +415,7 @@ export function getAllSrsCards(): SrsFlashcard[] {
       badge: `Ruchy mięśnia • ${profile.regionGroupPl}`,
       region: profile.region,
       frontTitle: `${anat?.namePl ?? profile.muscleId} — ruchy i łańcuch zamknięty`,
-      frontSubtitle: anat?.nameEn,
+      frontSubtitle: capitalizeLatinTerm(anat?.nameLt) || undefined,
       frontPrompt:
         'Przypomnij główne ruchy mięśnia, podział na aktony/głowy (jeśli dotyczy), czynność w łańcuchu zamkniętym (odwrócony przyczep) oraz pozycję rozciągania.',
       backSections: sections,

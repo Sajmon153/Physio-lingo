@@ -40,7 +40,7 @@ import {
   getNervesForMuscle,
   type ClinicalNerveProfile,
 } from '../data/nerveMuscleMap';
-import { formatBilingualName } from '../three/anatomyTranslator';
+import { capitalizeLatinTerm, formatBilingualName } from '../three/anatomyTranslator';
 import { getMuscleAttachmentZones } from '../three/boneSurfaceZones';
 import {
   AnatomicalStructure,
@@ -163,38 +163,44 @@ function normalizeExplorerRegion(input: ViewportModelMode): ExplorerRegionKey {
   }
 }
 
-function getPartNameEn(part: { nameEn?: string; structureId?: string }): string | undefined {
-  if (part.nameEn && part.nameEn.trim()) return part.nameEn.trim();
-  if (part.structureId && ANATOMY_MAP[part.structureId]?.nameEn) {
-    return ANATOMY_MAP[part.structureId].nameEn;
+function getPartNameLt(part: { nameLt?: string; structureId?: string }): string | undefined {
+  if (part.nameLt && part.nameLt.trim()) return capitalizeLatinTerm(part.nameLt.trim());
+  if (part.structureId && ANATOMY_MAP[part.structureId]?.nameLt) {
+    return capitalizeLatinTerm(ANATOMY_MAP[part.structureId].nameLt);
   }
   return undefined;
 }
 
 function getPartBilingualLabel(part: {
   namePl: string;
-  nameEn?: string;
+  nameLt?: string;
   bilingualName?: string;
   structureId?: string;
 }): string {
-  const en = getPartNameEn(part);
-  if (en) return formatBilingualName(part.namePl, en);
+  const lt = getPartNameLt(part);
+  if (lt) return formatBilingualName(part.namePl, lt);
   if (part.bilingualName && part.bilingualName.trim()) return part.bilingualName.trim();
   return part.namePl;
 }
 
-function getCategoryLabel(cat?: StructureCategory): string {
+function getCategoryLabel(cat?: StructureCategory, layerId?: string, isTendinousPart?: boolean): string {
+  if (isTendinousPart) return 'Część ścięgnista / Ścięgno';
+  if (layerId === 'sheath') return 'Pochewka ścięgna / Troczek';
+  if (layerId === 'cartilage') return 'Chrząstka / Łąkotka / Krążek';
+  if (layerId === 'ligament') return 'Więzadło / Torebka stawowa';
+  if (layerId === 'bursa') return 'Kaletka maziowa';
+  if (layerId === 'tendon') return 'Ścięgno / Rozcięgno';
   switch (cat) {
     case 'bone':
       return 'Kość / Punkt kostny';
     case 'joint_ligament':
       return 'Staw / Chrząstka / Więzadło';
     case 'muscle':
-      return 'Mięsień';
+      return 'Mięsień szkieletowy';
     case 'bursa':
       return 'Kaletka maziowa';
     case 'tendon':
-      return 'Ścięgno / Pochewka / Rozcięgno';
+      return 'Ścięgno / Rozcięgno';
     case 'ligament':
       return 'Więzadło / Torebka stawowa';
     case 'artery':
@@ -246,13 +252,15 @@ function getRegionBadgeLabel(region?: string): string {
 
 function getTissueBadge(part: SelectedPartInfo, entry: AnatomicalStructure | null): string {
   const cat = entry?.category ?? part.category;
+  if (part.layerId === 'sheath') return 'Pochewki i troczki';
+  if (part.layerId === 'cartilage') return 'Chrząstki i łąkotki';
+  if (part.isTendinousPart || cat === 'tendon' || part.layerId === 'tendon') return 'Ścięgna i rozcięgna';
   if (cat === 'artery' || part.layerId === 'artery') return 'Układ tętniczy';
   if (cat === 'vein' || part.layerId === 'vein') return 'Układ żylny';
   if (cat === 'nerve' || part.layerId === 'nerve') return 'Układ nerwowy';
   if (cat === 'organ' || part.layerId === 'organ') return 'Narządy wewnętrzne';
   if (cat === 'bursa' || part.layerId === 'bursa') return 'Kaletki maziowe';
-  if (cat === 'tendon' || part.layerId === 'tendon') return 'Ścięgna i pochewki';
-  if (cat === 'ligament' || part.layerId === 'ligament') return 'Aparat więzadłowy';
+  if (cat === 'ligament' || part.layerId === 'ligament') return 'Więzadła i torebki';
   if (cat === 'skin' || part.layerId === 'skin') return 'Powłoki skórne';
   if (cat === 'muscle' || part.tissueType === 'muscle') return 'Układ mięśniowy';
   if (cat === 'bone' || part.tissueType === 'bone') return 'Układ szkieletowy';
@@ -382,17 +390,10 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
 
   const selectedLandmarkEntry = useMemo(() => {
     if (!selectedPart) return null;
+    // Match ONLY when an actual bony landmark / PP-PK surface zone was selected (never hijack 3D ligament/tendon meshes!)
     return (
-      sceneLandmarks.find(
-        (lm) =>
-          lm.id === selectedPart.id ||
-          (lm.structureId && lm.structureId === selectedPart.structureId),
-      ) ??
-      BONY_LANDMARKS.find(
-        (lm) =>
-          lm.id === selectedPart.id ||
-          (lm.structureId && lm.structureId === selectedPart.structureId),
-      ) ??
+      sceneLandmarks.find((lm) => lm.id === selectedPart.id) ??
+      BONY_LANDMARKS.find((lm) => lm.id === selectedPart.id) ??
       null
     );
   }, [selectedPart, sceneLandmarks]);
@@ -608,7 +609,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
     // 1. Search 3D scene meshes (muscles, bones, vessels, nerves, organs, bursae, tendons, ligaments)
     for (const part of sceneParts) {
       const dbEntry = part.structureId ? ANATOMY_MAP[part.structureId] : undefined;
-      const primaryName = `${part.namePl} ${part.nameEn ?? ''}`;
+      const primaryName = `${part.namePl} ${part.nameLt ?? ''} ${part.nameEn ?? ''}`;
       const secondaryText = `${dbEntry?.nameLt ?? ''} ${(dbEntry?.aliases || []).join(' ')}`;
       const directMatch = matchesText(primaryName);
       if (!directMatch && !matchesText(secondaryText)) {
@@ -633,8 +634,8 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                   ? 'Kaletka'
                   : resolvedCat === 'tendon'
                     ? 'Ścięgno'
-                    : resolvedCat === 'ligament'
-                      ? 'Więzadło'
+                    : resolvedCat === 'ligament' || resolvedCat === 'joint_ligament'
+                      ? 'Więzadło / Staw'
                       : resolvedCat === 'skin'
                         ? 'Skóra'
                         : isMuscle
@@ -663,7 +664,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
 
     // 2. Search mounted 3D bony landmarks & PP/PK zones
     for (const lm of sceneLandmarks) {
-      const primaryName = `${lm.namePl} ${lm.nameEn ?? ''}`;
+      const primaryName = `${lm.namePl} ${lm.nameLt ?? ''} ${lm.nameEn ?? ''}`;
       const secondaryText = `${lm.boneNamePl ?? ''} ${(lm.attachedMuscles || []).join(' ')}`;
       const directMatch = matchesText(primaryName);
       if (!directMatch && !matchesText(secondaryText)) {
@@ -680,7 +681,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
       items.push({
         key: lm.id,
         kind: 'landmark',
-        label: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameEn),
+        label: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameLt),
         badge: lm.type === 'pp' ? 'PP' : lm.type === 'pk' ? 'PK' : 'Punkt kostny',
         badgeTone: lm.type === 'pp' ? 'pp' : lm.type === 'pk' ? 'pk' : 'bone',
         score,
@@ -1325,13 +1326,13 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
             deviceMode === 'phone'
               ? ''
               : deviceMode === 'ipad'
-                ? 'md:col-span-5'
-                : 'md:col-span-5 lg:col-span-4'
+                ? 'md:col-span-5 md:sticky md:top-20'
+                : 'md:col-span-5 md:sticky md:top-20 lg:col-span-4'
           }
         >
           <div
             data-testid="explorer-inspector"
-            className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-5 md:max-h-[612px] md:overflow-y-auto dark:border-[#233d2f] dark:bg-[#112018]"
+            className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-5 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto dark:border-[#233d2f] dark:bg-[#112018]"
           >
             {/* Priority 1: Active Dermatome & Myotome Radiculopathy Card */}
             {activeDermatomeLevel && !selectedPart ? (
@@ -1452,9 +1453,6 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                     <h2 className="mt-1.5 font-display text-lg font-extrabold text-emerald-950 dark:text-white">
                       {activeClinicalTest.namePl}
                     </h2>
-                    <div className="text-xs font-medium text-[#52695b] dark:text-[#94b0a0]">
-                      {activeClinicalTest.nameEn}
-                    </div>
                   </div>
                   <button
                     type="button"
@@ -1698,7 +1696,11 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                       </span>
                     ) : (
                       <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                        {getCategoryLabel(selectedEntry?.category ?? selectedPart.category)}
+                        {getCategoryLabel(
+                          selectedEntry?.category ?? selectedPart.category,
+                          selectedPart.layerId,
+                          selectedPart.isTendinousPart,
+                        )}
                       </span>
                     )}
                     <span className="rounded-md bg-[#ebf5ee] px-2 py-0.5 text-[10px] font-extrabold text-[#354c3f] dark:bg-[#182b21] dark:text-[#c7dbcf]">
@@ -1711,11 +1713,11 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                     )}
                   </div>
                   <h2 className="mt-1.5 font-display text-xl font-extrabold text-emerald-950 dark:text-white">
-                    {getPartBilingualLabel(selectedPart)}
+                    {selectedPart.namePl}
                   </h2>
-                  {selectedEntry?.nameLt && (
-                    <div className="mt-0.5 text-xs font-semibold italic text-[#52695b] dark:text-[#94b0a0]">
-                      {selectedEntry.nameLt}
+                  {getPartNameLt(selectedPart) && (
+                    <div className="mt-0.5 text-xs font-semibold italic text-emerald-700 dark:text-emerald-300">
+                      {getPartNameLt(selectedPart)}
                     </div>
                   )}
                 </div>
@@ -1834,6 +1836,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                               type="button"
                               data-testid={`nerve-innervated-muscle-${mId}`}
                               onClick={() => {
+                                setClinicalNerveHighlight(null);
                                 viewportRef.current?.selectAndFocusTarget?.({
                                   structureId: mId,
                                   isolateIfMuscle: false,
@@ -1976,7 +1979,9 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                         <span className="text-[#354c3f] dark:text-[#c7dbcf]">
                           {formatBilingualName(
                             selectedLandmarkEntry.boneNamePl,
-                            selectedLandmarkEntry.boneNameEn,
+                            selectedLandmarkEntry.boneId
+                              ? ANATOMY_MAP[selectedLandmarkEntry.boneId]?.nameLt
+                              : undefined,
                           )}
                         </span>
                       </div>
@@ -2024,7 +2029,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                 )}
 
                 {selectedEntry ? (() => {
-                  const labels = getStructureDetailLabels(selectedEntry.category);
+                  const labels = getStructureDetailLabels(selectedEntry.category, selectedEntry.id);
                   return (
                     <div className="space-y-2.5 border-t border-[#e6f0ea] pt-3 text-xs leading-relaxed dark:border-[#233d2f]">
                       <div>
@@ -2139,7 +2144,7 @@ export const Explorer3DView: React.FC<Explorer3DViewProps> = ({
                     Kliknij strukturę na modelu 3D
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-[#52695b] dark:text-[#94b0a0]">
-                    Kliknięta struktura podświetli się na modelu 3D i wyświetli tutaj najważniejsze informacje anatomiczne: nazwy PL/EN/łac., przyczepy (PP/PK), czynność, unerwienie i korelacje kliniczne.
+                    Kliknięta struktura zachowa swój naturalny kolor tkankowy, wyeksponuje się na tle półprzezroczystych sąsiednich mięśni i wyświetli tutaj nazwy polskie i łacińskie (TA), przyczepy (PP/PK), czynność, unerwienie i korelacje kliniczne.
                   </p>
                 </div>
               </div>

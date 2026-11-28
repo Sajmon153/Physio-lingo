@@ -42,15 +42,25 @@ import {
   type SelectableMeshMeta,
 } from '../three/proceduralModels';
 export type { SelectableMeshMeta };
-import { formatBilingualName, translateMeshNameToPolish } from '../three/anatomyTranslator';
+import {
+  capitalizeLatinTerm,
+  formatBilingualName,
+  translateMeshNameToPolish,
+} from '../three/anatomyTranslator';
 import { computeClickOrbitGoal } from '../three/cameraFocus';
 import {
   ANATOMY_LAYERS_META,
+  applyMuscleMyotendinousVertexColors,
+  buildSynthesizedAnatomicalTendons,
   classifyBaseGlbMeshLayer,
   createDefaultLayerVisibility,
   createMaterialForLayer,
+  createMuscleVertexColorMaterial,
+  formatMuscleSubpartLatin,
   formatMuscleSubpartPolish,
+  getMuscleSubpartVariantIndex,
   getUnifiedMeshGroupKey,
+  isRaycastHitOnTendinousPart,
   layerIdToLegacyTissueType,
   loadLayersManifest,
   OVERLAY_KEY_TO_LAYER_ID,
@@ -176,6 +186,10 @@ const LOWER_LIMB_STRUCTURES_IDS = new Set([
   'm_peroneus_longus',
   'pes_anserinus',
   'achilles_tendon',
+  'tendon_quadriceps',
+  'lig_patellae',
+  'tractus_iliotibialis',
+  'aponeurosis_plantaris',
   'a_femoralis',
   'a_profunda_femoris',
   'a_poplitea',
@@ -269,19 +283,19 @@ export function resolveRegionalModelPath(
 }
 
 const REGION_TITLES: Record<string, string> = {
-  full_body: 'Podgląd 3D: Pełny model anatomiczny (Full Body)',
-  head_neck: 'Model 3D: Głowa i szyja (Head & Neck)',
-  torso: 'Model 3D: Tułów (Torso)',
-  spine_thorax: 'Model 3D: Kręgosłup i klatka piersiowa (Spine & Thorax)',
-  pelvis_hip: 'Model 3D: Miednica i staw biodrowy (Pelvis & Hip)',
-  shoulder: 'Model 3D: Kompleks barkowy (Shoulder Complex)',
-  upper_limb: 'Model 3D: Kończyna górna (Upper Limb)',
-  upper_limb_left: 'Model 3D: Kończyna górna lewa (Left Upper Limb)',
-  upper_limb_right: 'Model 3D: Kończyna górna prawa (Right Upper Limb)',
-  knee: 'Model 3D: Staw kolanowy (Knee Joint)',
-  lower_limb: 'Model 3D: Kończyna dolna (Lower Limb)',
-  lower_limb_left: 'Model 3D: Kończyna dolna lewa (Left Lower Limb)',
-  lower_limb_right: 'Model 3D: Kończyna dolna prawa (Right Lower Limb)',
+  full_body: 'Model 3D: Całe ciało (Corpus humanum)',
+  head_neck: 'Model 3D: Głowa i szyja (Caput et collum)',
+  torso: 'Model 3D: Tułów (Truncus)',
+  spine_thorax: 'Model 3D: Kręgosłup i klatka piersiowa (Columna vertebralis et thorax)',
+  pelvis_hip: 'Model 3D: Miednica i staw biodrowy (Pelvis et articulatio coxae)',
+  shoulder: 'Model 3D: Kompleks barkowy (Cingulum pectorale)',
+  upper_limb: 'Model 3D: Kończyna górna (Membrum superius)',
+  upper_limb_left: 'Model 3D: Kończyna górna lewa (Membrum superius sinistrum)',
+  upper_limb_right: 'Model 3D: Kończyna górna prawa (Membrum superius dextrum)',
+  knee: 'Model 3D: Staw kolanowy (Articulatio genus)',
+  lower_limb: 'Model 3D: Kończyna dolna (Membrum inferius)',
+  lower_limb_left: 'Model 3D: Kończyna dolna lewa (Membrum inferius sinistrum)',
+  lower_limb_right: 'Model 3D: Kończyna dolna prawa (Membrum inferius dextrum)',
 };
 
 export type TissueLayerFilter = 'all' | 'muscle' | 'bone';
@@ -291,12 +305,14 @@ export interface SelectedPartInfo {
   id: string;
   rawMeshName?: string;
   namePl: string;
+  nameLt?: string;
   nameEn?: string;
   bilingualName?: string;
   structureId?: string;
   category?: StructureCategory;
   tissueType?: 'muscle' | 'bone' | 'other';
   layerId?: AnatomicalLayerId;
+  isTendinousPart?: boolean;
 }
 
 export interface AnatomyViewport3DHandle {
@@ -343,6 +359,7 @@ export interface AnatomyViewport3DProps {
   enableGitHubBrowser?: boolean;
   hideHotspotOverlay?: boolean;
   hideHoverLabel?: boolean;
+  ghostOtherMusclesOnSelect?: boolean;
   highlightMode?: 'neutral' | 'correct' | 'wrong';
 }
 
@@ -398,6 +415,7 @@ export const AnatomyViewport3D = React.forwardRef<
       enableGitHubBrowser = false,
       hideHotspotOverlay = false,
       hideHoverLabel = false,
+      ghostOtherMusclesOnSelect,
       highlightMode = 'neutral',
     },
     ref,
@@ -417,6 +435,8 @@ export const AnatomyViewport3D = React.forwardRef<
     onIsolatedMuscleChangeRef.current = onIsolatedMuscleChange;
     const hideHoverLabelRef = useRef(hideHoverLabel);
     hideHoverLabelRef.current = hideHoverLabel;
+    const ghostOtherMusclesRef = useRef(ghostOtherMusclesOnSelect ?? !hideHoverLabel);
+    ghostOtherMusclesRef.current = ghostOtherMusclesOnSelect ?? !hideHoverLabel;
     const enableExtendedLayersRef = useRef(enableExtendedLayers);
     enableExtendedLayersRef.current = enableExtendedLayers;
     const clinicalNerveHighlightRef = useRef<ClinicalNerveHighlight | null>(clinicalNerveHighlight);
@@ -617,11 +637,13 @@ export const AnatomyViewport3D = React.forwardRef<
           id: ud.id,
           rawMeshName: ud.rawName || hitMesh.name,
           namePl: ud.namePl,
+          nameLt: ud.nameLt,
           nameEn: ud.nameEn,
-          bilingualName: ud.bilingualName || formatBilingualName(ud.namePl, ud.nameEn),
+          bilingualName: ud.bilingualName || formatBilingualName(ud.namePl, ud.nameLt),
           structureId: ud.structureId,
           category: ud.category,
           tissueType: ud.tissueType,
+          layerId: ud.layerId,
         });
         sceneRefs.current.focusMesh(ud.id);
       }
@@ -640,7 +662,6 @@ export const AnatomyViewport3D = React.forwardRef<
       vertebrae_lumbales: 'vertebra_l4_spinous_process',
       discus_intervertebralis: 'vertebra_l4_spinous_process',
       acetabulum: 'pelvis_aiis_r',
-      achilles_tendon: 'calcaneus_tuberosity_r',
       m_tensor_fasciae_latae: 'pelvis_asis_r',
     };
 
@@ -663,8 +684,9 @@ export const AnatomyViewport3D = React.forwardRef<
             onSelectPartRef.current({
               id: lm.id,
               namePl: lm.namePl,
+              nameLt: lm.nameLt,
               nameEn: lm.nameEn,
-              bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameEn),
+              bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameLt),
               structureId: lm.structureId || lm.id,
               category: 'bone',
               tissueType: 'bone',
@@ -675,8 +697,11 @@ export const AnatomyViewport3D = React.forwardRef<
         }
       }
 
-      // 2. Landmark matched by structureId (e.g., tuberculum_majus, acl, pes_anserinus)
-      if (target.structureId) {
+      // 2. Landmark matched by structureId (ONLY if no real 3D mesh exists for that structureId!)
+      if (
+        target.structureId &&
+        !refs.interactables.some((m) => m.userData.structureId === target.structureId)
+      ) {
         const zoneByStructure = getBoneZoneWorldPosition(refs.interactables, target.structureId);
         if (zoneByStructure) {
           setXrayMode(false);
@@ -689,8 +714,9 @@ export const AnatomyViewport3D = React.forwardRef<
             onSelectPartRef.current({
               id: lm.id,
               namePl: lm.namePl,
+              nameLt: lm.nameLt,
               nameEn: lm.nameEn,
-              bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameEn),
+              bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameLt),
               structureId: lm.structureId || lm.id,
               category: 'bone',
               tissueType: 'bone',
@@ -748,8 +774,9 @@ export const AnatomyViewport3D = React.forwardRef<
           id: ud.id,
           rawMeshName: ud.rawName || hitMesh.name,
           namePl: ud.namePl,
+          nameLt: ud.nameLt,
           nameEn: ud.nameEn,
-          bilingualName: ud.bilingualName || formatBilingualName(ud.namePl, ud.nameEn),
+          bilingualName: ud.bilingualName || formatBilingualName(ud.namePl, ud.nameLt),
           structureId: ud.structureId,
           category: ud.category,
           tissueType: ud.tissueType,
@@ -959,10 +986,13 @@ export const AnatomyViewport3D = React.forwardRef<
         else if (entry.category === 'vein') allowed.add('vein');
         else if (entry.category === 'organ') allowed.add('organ');
         else if (entry.category === 'bursa') allowed.add('bursa');
-        else if (entry.category === 'tendon') allowed.add('tendon');
-        else if (entry.category === 'ligament' || entry.category === 'joint_ligament') {
+        else if (entry.category === 'tendon') {
+          allowed.add('tendon');
+          allowed.add('sheath');
+        } else if (entry.category === 'ligament' || entry.category === 'joint_ligament') {
           allowed.add('ligament');
           allowed.add('tendon');
+          allowed.add('sheath');
         } else if (entry.category === 'skin') {
           allowed.add('skin');
         }
@@ -1012,7 +1042,10 @@ export const AnatomyViewport3D = React.forwardRef<
             layerId !== 'cartilage';
         } else if (activeBiomHlt) {
           hiddenByLayer =
-            layerId !== 'muscle' && layerId !== 'bone' && layerId !== 'cartilage';
+            layerId !== 'muscle' &&
+            layerId !== 'tendon' &&
+            layerId !== 'bone' &&
+            layerId !== 'cartilage';
         } else if (isolatedMusclePartId) {
           if (layerId === 'muscle') {
             hiddenByLayer = id !== isolatedMusclePartId && structureId !== isolatedMusclePartId;
@@ -1023,7 +1056,7 @@ export const AnatomyViewport3D = React.forwardRef<
             hiddenByLayer = true;
           }
         } else if (layerFilter === 'muscle') {
-          hiddenByLayer = layerId !== 'muscle';
+          hiddenByLayer = layerId !== 'muscle' && layerId !== 'tendon';
         } else if (layerFilter === 'bone') {
           hiddenByLayer = layerId !== 'bone' && layerId !== 'cartilage';
         } else {
@@ -1079,15 +1112,38 @@ export const AnatomyViewport3D = React.forwardRef<
         if (muscleGroupingMode === 'whole' && unifiedId) {
           nextId = unifiedId;
           if (ud.wholeNamePl) ud.namePl = ud.wholeNamePl;
+          if (ud.wholeNameLt) ud.nameLt = ud.wholeNameLt;
           if (ud.wholeNameEn) ud.nameEn = ud.wholeNameEn;
           if (ud.wholeBilingualName) ud.bilingualName = ud.wholeBilingualName;
-        } else if (unifiedId) {
+        } else if (unifiedId || ud.structureId === 'm_quadriceps_femoris') {
           nextId = individualId;
           if (ud.partNamePl) ud.namePl = ud.partNamePl;
+          if (ud.partNameLt) ud.nameLt = ud.partNameLt;
           if (ud.partNameEn) ud.nameEn = ud.partNameEn;
           if (ud.partBilingualName) ud.bilingualName = ud.partBilingualName;
         }
         ud.id = nextId;
+
+        // Update per-vertex muscle head variant shading when switching 'whole' <-> 'parts'
+        if (
+          ud.layerId === 'muscle' &&
+          (unifiedId || ud.structureId === 'm_quadriceps_femoris') &&
+          mesh.geometry
+        ) {
+          const desiredVariant =
+            muscleGroupingMode === 'parts'
+              ? getMuscleSubpartVariantIndex((ud.rawName as string) || mesh.name)
+              : 0;
+          if (mesh.geometry.userData.muscleVariantIndex !== desiredVariant) {
+            applyMuscleMyotendinousVertexColors(
+              mesh.geometry,
+              (ud.rawName as string) || mesh.name,
+              desiredVariant,
+            );
+            const colAttr = mesh.geometry.getAttribute('color');
+            if (colAttr) colAttr.needsUpdate = true;
+          }
+        }
 
         const grp = rebuiltPartMeshes.get(nextId);
         if (grp) {
@@ -1096,11 +1152,12 @@ export const AnatomyViewport3D = React.forwardRef<
           rebuiltPartMeshes.set(nextId, [mesh]);
           const bLabel =
             (ud.bilingualName as string | undefined) ||
-            formatBilingualName((ud.namePl as string) || '', ud.nameEn as string | undefined);
+            formatBilingualName((ud.namePl as string) || '', ud.nameLt as string | undefined);
           rebuiltLabels[nextId] = bLabel;
           rebuiltMetas.push({
             id: nextId,
             namePl: (ud.namePl as string) || '',
+            nameLt: ud.nameLt as string | undefined,
             nameEn: (ud.nameEn as string | undefined) || '',
             bilingualName: bLabel,
             structureId: ud.structureId as string | undefined,
@@ -1302,6 +1359,20 @@ export const AnatomyViewport3D = React.forwardRef<
             !isHovered,
         );
 
+        const hasActiveSelectionContext =
+          ghostOtherMusclesRef.current &&
+          (Boolean(selId) || Boolean(selectedHotspotRef.current));
+
+        const isSelectionContextGhostedMuscle =
+          hasActiveSelectionContext &&
+          !activeDermLevel &&
+          !activeTestIds &&
+          !activeNerveProfile &&
+          !activeBiomMovement &&
+          !isSelected &&
+          !isHovered &&
+          meshLayerId === 'muscle';
+
         const isXrayMuscle =
           isXrayActive &&
           !activeDermLevel &&
@@ -1316,6 +1387,7 @@ export const AnatomyViewport3D = React.forwardRef<
           isSelected ||
           isHovered ||
           isXrayMuscle ||
+          isSelectionContextGhostedMuscle ||
           isDermSkinMatch ||
           isDermSkinMuted ||
           isMyotomeMuscleMatch ||
@@ -1341,6 +1413,11 @@ export const AnatomyViewport3D = React.forwardRef<
           const mat = mesh.material;
           const origMat = mesh.userData.originalMaterial;
           if (!Array.isArray(mat) && mat instanceof THREE.MeshStandardMaterial) {
+            const origStd =
+              !Array.isArray(origMat) && origMat instanceof THREE.MeshStandardMaterial
+                ? origMat
+                : null;
+
             if (isDermSkinMatch && activeDermLevel && activeDermHlt) {
               mat.color.set(activeDermLevel.accentHex);
               mat.emissive.set(activeDermLevel.accentHex);
@@ -1350,9 +1427,7 @@ export const AnatomyViewport3D = React.forwardRef<
               mat.depthWrite = activeDermHlt.mode === 'dermatome';
               mat.needsUpdate = true;
             } else if (isDermSkinMuted && activeDermHlt) {
-              if (!Array.isArray(origMat) && origMat instanceof THREE.MeshStandardMaterial) {
-                mat.color.copy(origMat.color);
-              }
+              if (origStd) mat.color.copy(origStd.color);
               mat.emissive.setHex(0x000000);
               mat.emissiveIntensity = 0;
               mat.transparent = true;
@@ -1361,98 +1436,137 @@ export const AnatomyViewport3D = React.forwardRef<
               mat.needsUpdate = true;
             } else if (
               isXrayMuscle ||
+              isSelectionContextGhostedMuscle ||
               isClinicalGhostedMuscle ||
               isMyotomeMuscleGhosted ||
               isTestGhostedMuscle ||
               isBiomGhostedMuscle
             ) {
-              if (!Array.isArray(origMat) && origMat instanceof THREE.MeshStandardMaterial) {
-                mat.color.copy(origMat.color);
-                mat.vertexColors = origMat.vertexColors;
+              if (origStd) {
+                mat.color.copy(origStd.color);
+                mat.vertexColors = origStd.vertexColors;
+                mat.roughness = origStd.roughness;
               }
               mat.emissive.setHex(0x000000);
               mat.emissiveIntensity = 0;
               mat.transparent = true;
-              mat.opacity = isXrayMuscle ? 0.22 : 0.14;
+              mat.opacity = isSelectionContextGhostedMuscle
+                ? 0.18
+                : isXrayMuscle
+                  ? 0.22
+                  : 0.14;
               mat.depthWrite = false;
               mat.needsUpdate = true;
             } else {
-              mat.transparent = false;
-              mat.opacity = 1;
-              mat.depthWrite = true;
-              if (mat.vertexColors) {
-                // Ensure vertex-colored tendon-to-belly muscles highlight uniformly
-                mat.vertexColors = false;
-                mat.needsUpdate = true;
+              // Restore baseline true tissue color & myotendinous vertex colors first!
+              if (origStd) {
+                mat.color.copy(origStd.color);
+                mat.vertexColors = origStd.vertexColors;
+                mat.roughness = origStd.roughness;
+                mat.transparent = origStd.transparent;
+                mat.opacity = origStd.opacity;
+                mat.depthWrite = origStd.depthWrite;
               }
-              if (!Array.isArray(origMat) && origMat instanceof THREE.MeshStandardMaterial) {
-                if (origMat.vertexColors) {
-                  mat.color.setHex(0xb84050);
-                } else {
-                  mat.color.copy(origMat.color);
-                }
-              }
+
               if (isMyotomeMuscleMatch) {
-                mat.color.lerp(new THREE.Color(0x10b981), 0.76);
-                mat.emissive.setHex(0x059669);
-                mat.emissiveIntensity = 0.68;
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
+                mat.emissive.setHex(0x10b981);
+                mat.emissiveIntensity = 0.42;
               } else if (isTestTargetStructure) {
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
                 if (meshLayerId === 'nerve') {
-                  mat.color.setHex(0xfef08a);
-                  mat.emissive.setHex(0xeab308);
-                  mat.emissiveIntensity = 0.95;
+                  mat.emissive.setHex(0xfacc15);
+                  mat.emissiveIntensity = 0.55;
                 } else if (meshLayerId === 'artery') {
-                  mat.color.setHex(0xfca5a5);
-                  mat.emissive.setHex(0xdc2626);
-                  mat.emissiveIntensity = 0.85;
-                } else if (
-                  meshLayerId === 'bursa' ||
-                  meshLayerId === 'tendon' ||
-                  meshLayerId === 'ligament' ||
-                  meshLayerId === 'cartilage'
-                ) {
-                  mat.color.setHex(0xfde68a);
-                  mat.emissive.setHex(0xf59e0b);
-                  mat.emissiveIntensity = 0.78;
+                  mat.emissive.setHex(0xe11d48);
+                  mat.emissiveIntensity = 0.5;
                 } else {
-                  mat.color.lerp(new THREE.Color(0x10b981), 0.76);
-                  mat.emissive.setHex(0x059669);
-                  mat.emissiveIntensity = 0.7;
+                  mat.emissive.setHex(0xfde68a);
+                  mat.emissiveIntensity = 0.36;
                 }
               } else if (isClinicalTargetNerve) {
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
                 mat.color.setHex(0xfef08a);
                 mat.emissive.setHex(0xeab308);
-                mat.emissiveIntensity = 0.95;
+                mat.emissiveIntensity = 0.85;
               } else if (isClinicalInnervatedMuscle) {
-                mat.color.lerp(new THREE.Color(0x10b981), 0.72);
-                mat.emissive.setHex(0x059669);
-                mat.emissiveIntensity = 0.65;
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
+                mat.emissive.setHex(0x10b981);
+                mat.emissiveIntensity = 0.38;
               } else if (activeBiomRole === 'agonist') {
-                mat.color.lerp(new THREE.Color(0x10b981), 0.8);
-                mat.emissive.setHex(0x059669);
-                mat.emissiveIntensity = 0.74;
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
+                mat.emissive.setHex(0x10b981);
+                mat.emissiveIntensity = 0.48;
               } else if (activeBiomRole === 'synergist') {
-                mat.color.lerp(new THREE.Color(0xf59e0b), 0.8);
-                mat.emissive.setHex(0xd97706);
-                mat.emissiveIntensity = 0.68;
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
+                mat.emissive.setHex(0xf59e0b);
+                mat.emissiveIntensity = 0.45;
               } else if (activeBiomRole === 'antagonist') {
-                mat.color.lerp(new THREE.Color(0xf43f5e), 0.8);
+                mat.transparent = false;
+                mat.opacity = 1;
+                mat.depthWrite = true;
                 mat.emissive.setHex(0xe11d48);
-                mat.emissiveIntensity = 0.68;
+                mat.emissiveIntensity = 0.45;
               } else if (isSelected) {
                 if (mode === 'wrong') {
-                  mat.color.lerp(new THREE.Color(0xef4444), 0.78);
+                  mat.transparent = false;
+                  mat.opacity = 1;
+                  mat.depthWrite = true;
+                  mat.color.lerp(new THREE.Color(0xef4444), 0.72);
                   mat.emissive.setHex(0xdc2626);
-                  mat.emissiveIntensity = 0.8;
-                } else {
-                  mat.color.lerp(new THREE.Color(0x22c55e), 0.8);
+                  mat.emissiveIntensity = 0.72;
+                } else if (mode === 'correct') {
+                  mat.transparent = false;
+                  mat.opacity = 1;
+                  mat.depthWrite = true;
+                  mat.color.lerp(new THREE.Color(0x22c55e), 0.72);
                   mat.emissive.setHex(0x16a34a);
-                  mat.emissiveIntensity = 0.82;
+                  mat.emissiveIntensity = 0.72;
+                } else if (hideHoverLabelRef.current) {
+                  // Reverse Pin Exam unnamed target beacon — bright unmistakable highlight
+                  mat.transparent = false;
+                  mat.opacity = 1;
+                  mat.depthWrite = true;
+                  mat.color.lerp(new THREE.Color(0x34d399), 0.65);
+                  mat.emissive.setHex(0x10b981);
+                  mat.emissiveIntensity = 0.68;
+                } else {
+                  // Standard selection: preserve 100% of true tissue color & myotendinous shading
+                  // with a crisp luminous sheen while surrounding muscles turn semi-transparent!
+                  if (origStd && origStd.transparent && origStd.opacity < 0.92) {
+                    mat.opacity = Math.min(0.95, origStd.opacity + 0.22);
+                    mat.depthWrite = true;
+                  } else {
+                    mat.transparent = false;
+                    mat.opacity = 1;
+                    mat.depthWrite = true;
+                  }
+                  mat.color.lerp(new THREE.Color(0xffffff), 0.12);
+                  mat.emissive.setHex(0xfffbeb);
+                  mat.emissiveIntensity = 0.24;
+                  if (origStd) {
+                    mat.roughness = Math.max(0.15, origStd.roughness * 0.8);
+                  }
                 }
+                mat.needsUpdate = true;
               } else {
-                mat.color.lerp(new THREE.Color(0xf59e0b), 0.52);
-                mat.emissive.setHex(0xf59e0b);
-                mat.emissiveIntensity = 0.42;
+                // Hover: keep true tissue color & vertex colors with gentle warm luminance
+                mat.color.lerp(new THREE.Color(0xffffff), 0.08);
+                mat.emissive.setHex(0xfde68a);
+                mat.emissiveIntensity = 0.18;
+                mat.needsUpdate = true;
               }
             }
           }
@@ -2077,10 +2191,10 @@ export const AnatomyViewport3D = React.forwardRef<
       refs.modelBounds = box;
 
       if (refs.pedestal) {
-        refs.pedestal.position.y = box.min.y - 0.04;
+        refs.pedestal.position.y = box.min.y - 0.065;
       }
       if (refs.contactShadow) {
-        refs.contactShadow.position.y = box.min.y - 0.008;
+        refs.contactShadow.position.y = box.min.y - 0.012;
       }
 
       controls.target.copy(center);
@@ -2092,9 +2206,9 @@ export const AnatomyViewport3D = React.forwardRef<
         );
       } else if (mode === 'knee') {
         camera.position.set(
-          center.x + maxDim * 0.72,
-          center.y + maxDim * 0.12,
-          center.z + maxDim * 1.55,
+          center.x + maxDim * 0.62,
+          center.y + maxDim * 0.08,
+          center.z + maxDim * 1.48,
         );
       } else if (mode === 'full_body') {
         camera.position.set(
@@ -2149,13 +2263,13 @@ export const AnatomyViewport3D = React.forwardRef<
         controls.target.set(center.x, targetY, center.z);
         camera.position.set(center.x, targetY, center.z + maxDim * 0.58);
       } else if (zone === 'knee') {
-        const targetY = box.min.y + size.y * 0.27;
-        const targetX = center.x - size.x * 0.12;
+        const targetY = box.min.y + size.y * 0.285;
+        const targetX = center.x - size.x * 0.11;
         controls.target.set(targetX, targetY, center.z);
         camera.position.set(
-          targetX - size.x * 0.22,
-          targetY + size.y * 0.04,
-          center.z + maxDim * 0.52,
+          targetX - size.x * 0.14,
+          targetY + size.y * 0.01,
+          center.z + maxDim * 0.38,
         );
       }
       controls.update();
@@ -2337,11 +2451,13 @@ export const AnatomyViewport3D = React.forwardRef<
       onSelectPartRef.current({
         id: lm.id,
         namePl: lm.namePl,
+        nameLt: lm.nameLt,
         nameEn: lm.nameEn,
-        bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameEn),
+        bilingualName: lm.bilingualName || formatBilingualName(lm.namePl, lm.nameLt),
         structureId: resolvedId,
         category: 'bone',
         tissueType: 'bone',
+        layerId: 'bone',
       });
       refs.focusHotspot?.(lm, true);
     };
@@ -2400,7 +2516,7 @@ export const AnatomyViewport3D = React.forwardRef<
       const labels: Record<string, string> = {};
       for (const meta of built.partMetas) {
         labels[meta.id] =
-          meta.bilingualName || formatBilingualName(meta.namePl, meta.nameEn);
+          meta.bilingualName || formatBilingualName(meta.namePl, meta.nameLt);
       }
       setPartLabelsById(labels);
 
@@ -2479,9 +2595,10 @@ export const AnatomyViewport3D = React.forwardRef<
           mesh.visible =
             lid === 'muscle' || lid === 'nerve' || lid === 'bone' || lid === 'cartilage';
         } else if (activeBiom) {
-          mesh.visible = lid === 'muscle' || lid === 'bone' || lid === 'cartilage';
+          mesh.visible =
+            lid === 'muscle' || lid === 'tendon' || lid === 'bone' || lid === 'cartilage';
         } else if (layerFilter === 'muscle') {
-          mesh.visible = lid === 'muscle';
+          mesh.visible = lid === 'muscle' || lid === 'tendon';
         } else if (layerFilter === 'bone') {
           mesh.visible = lid === 'bone' || lid === 'cartilage';
         } else {
@@ -2508,9 +2625,18 @@ export const AnatomyViewport3D = React.forwardRef<
             child.material && !Array.isArray(child.material) ? child.material.name : ''
           ).toLowerCase();
 
-          const isBursaRaw = /\bbursae?\b/i.test(rawTitle);
-          const isTendonRaw = /\b(tendon|sheath|aponeurosis|retinaculum|fascia|linea\s+alba)\b/i.test(rawTitle);
+          const isBonyLandmarkOrGroove =
+            rawType === 'bone' ||
+            matName === 'mat_bone_pro' ||
+            /\b(groove\s+for|grooves\s+for|sulcus|tubercle\s+of|tuberosity|articular\s+facet|facet\s+for|surface\s+of|linea\s+a[sp]pera|process\s+of\s+calcane)\b/i.test(
+              rawTitle,
+            );
+          const isBursaRaw = !isBonyLandmarkOrGroove && /\bbursae?\b/i.test(rawTitle);
+          const isTendonRaw =
+            !isBonyLandmarkOrGroove &&
+            /\b(tendon|sheath|aponeurosis|retinaculum|fascia|linea\s+alba|tract)\b/i.test(rawTitle);
           const isMuscleTissue =
+            !isBonyLandmarkOrGroove &&
             !isBursaRaw &&
             !isTendonRaw &&
             (rawType === 'muscle' ||
@@ -2524,7 +2650,7 @@ export const AnatomyViewport3D = React.forwardRef<
               ? ('tendon' as const)
               : isMuscleTissue
                 ? ('muscle' as const)
-                : rawType === 'bone' || matName.includes('bone') || matName === 'mat_bone_pro'
+                : isBonyLandmarkOrGroove || matName.includes('bone')
                   ? ('bone' as const)
                   : ('other' as const);
 
@@ -2550,10 +2676,20 @@ export const AnatomyViewport3D = React.forwardRef<
           );
           bumpCount(layerId);
 
-          // Apply specialized PBR materials for cartilage (mint), bursae (pearly white), and tendons/sheaths (satin white)
-          const overrideMat = createMaterialForLayer(layerId, rawTitle);
-          if (overrideMat) {
-            child.material = overrideMat;
+          // Apply 12-tissue Atlas Pro materials + per-vertex myotendinous shading on skeletal muscles
+          if (layerId === 'muscle') {
+            child.geometry = child.geometry.clone();
+            const initVariant =
+              muscleGroupingModeRef.current === 'parts'
+                ? getMuscleSubpartVariantIndex(rawTitle)
+                : 0;
+            applyMuscleMyotendinousVertexColors(child.geometry, rawTitle, initVariant);
+            child.material = createMuscleVertexColorMaterial();
+          } else {
+            const overrideMat = createMaterialForLayer(layerId, rawTitle);
+            if (overrideMat) {
+              child.material = overrideMat;
+            }
           }
 
           const tissueType = layerIdToLegacyTissueType(layerId);
@@ -2573,11 +2709,14 @@ export const AnatomyViewport3D = React.forwardRef<
 
           const anatomicalSide: 'left' | 'right' | undefined =
             anatomicalX > 0.002 ? 'left' : anatomicalX < -0.002 ? 'right' : undefined;
-          const subpartPl = unifiedId ? formatMuscleSubpartPolish(rawTitle) : null;
+          const hasSubpart = Boolean(unifiedId || translated.structureId === 'm_quadriceps_femoris');
+          const subpartPl = hasSubpart ? formatMuscleSubpartPolish(rawTitle) : null;
+          const subpartLt = hasSubpart ? formatMuscleSubpartLatin(rawTitle) : null;
           const wholeNamePl = translated.namePl;
+          const wholeNameLt = translated.nameLt;
           const wholeNameEn = translated.nameEn;
           const wholeBilingualName =
-            translated.bilingualName || formatBilingualName(wholeNamePl, wholeNameEn);
+            translated.bilingualName || formatBilingualName(wholeNamePl, wholeNameLt);
 
           const baseWithoutSidePl = wholeNamePl.replace(/\s*\(strona\s+(prawa|lewa)\)/i, '').trim();
           const sideSuffixMatch = wholeNamePl.match(/\s*\(strona\s+(prawa|lewa)\)/i);
@@ -2585,23 +2724,38 @@ export const AnatomyViewport3D = React.forwardRef<
           const partNamePl = subpartPl
             ? `${baseWithoutSidePl} — ${subpartPl}${sideSuffix}`
             : wholeNamePl;
+          const partNameLt = subpartLt
+            ? subpartLt.toLowerCase().startsWith('musculus ')
+              ? capitalizeLatinTerm(subpartLt)
+              : wholeNameLt
+                ? `${capitalizeLatinTerm(wholeNameLt)}, ${subpartLt}`
+                : capitalizeLatinTerm(subpartLt)
+            : wholeNameLt;
           const partNameEn =
             rawTitle
               .replace(/[_]+/g, ' ')
-              .replace(/\.(r|l)$/gi, '')
+              .replace(/\.(r|l)(?:\.\d+)?$/gi, '')
               .replace(/\.?\d{3}$/g, '')
               .replace(/\s+/g, ' ')
               .trim() || wholeNameEn;
-          const partBilingualName = formatBilingualName(partNamePl, partNameEn);
+          const partBilingualName = formatBilingualName(partNamePl, partNameLt);
 
           const activeNamePl =
-            muscleGroupingModeRef.current === 'parts' && unifiedId ? partNamePl : wholeNamePl;
+            muscleGroupingModeRef.current === 'parts' && hasSubpart ? partNamePl : wholeNamePl;
+          const activeNameLt =
+            muscleGroupingModeRef.current === 'parts' && hasSubpart ? partNameLt : wholeNameLt;
           const activeNameEn =
-            muscleGroupingModeRef.current === 'parts' && unifiedId ? partNameEn : wholeNameEn;
+            muscleGroupingModeRef.current === 'parts' && hasSubpart ? partNameEn : wholeNameEn;
           const activeBilingualName =
-            muscleGroupingModeRef.current === 'parts' && unifiedId
+            muscleGroupingModeRef.current === 'parts' && hasSubpart
               ? partBilingualName
               : wholeBilingualName;
+
+          const tendinousNamePl = translated.tendinousNamePl;
+          const tendinousNameLt = translated.tendinousNameLt;
+          const tendinousBilingualName = tendinousNamePl
+            ? formatBilingualName(tendinousNamePl, tendinousNameLt)
+            : undefined;
 
           // Compute radial displacement vector relative to longitudinal body axis (Y)
           const explodeVec = new THREE.Vector3(worldCenter.x, 0, worldCenter.z);
@@ -2609,7 +2763,10 @@ export const AnatomyViewport3D = React.forwardRef<
             explodeVec.set(0.1, 0, 0.1);
           }
           explodeVec.normalize();
-          const dist = layerId === 'muscle' || layerId === 'bursa' || layerId === 'tendon' ? 0.35 : 0.12;
+          const dist =
+            layerId === 'muscle' || layerId === 'bursa' || layerId === 'tendon' || layerId === 'sheath'
+              ? 0.35
+              : 0.12;
           explodeVec.multiplyScalar(dist);
 
           child.userData = {
@@ -2619,14 +2776,20 @@ export const AnatomyViewport3D = React.forwardRef<
             unifiedId,
             anatomicalSide,
             namePl: activeNamePl,
+            nameLt: activeNameLt,
             nameEn: activeNameEn,
             bilingualName: activeBilingualName,
             wholeNamePl,
+            wholeNameLt,
             wholeNameEn,
             wholeBilingualName,
             partNamePl,
+            partNameLt,
             partNameEn,
             partBilingualName,
+            tendinousNamePl,
+            tendinousNameLt,
+            tendinousBilingualName,
             structureId: translated.structureId,
             category: translated.category,
             isCartilage,
@@ -2654,6 +2817,7 @@ export const AnatomyViewport3D = React.forwardRef<
             metas.push({
               id,
               namePl: activeNamePl,
+              nameLt: activeNameLt,
               nameEn: activeNameEn,
               bilingualName: bilingualLabel,
               structureId: translated.structureId,
@@ -2669,6 +2833,66 @@ export const AnatomyViewport3D = React.forwardRef<
           }
         }
       });
+
+      // Synthesize sculpted 3D major tendons/ligaments absent from Z-Anatomy's GLB export
+      // (Ścięgno Achillesa, Ścięgno m. czworogłowego uda, Więzadło rzepki, Pasmo biodrowo-piszczelowe)
+      model.updateMatrixWorld(true);
+      const synthesizedTendons = buildSynthesizedAnatomicalTendons(model);
+      for (const spec of synthesizedTendons) {
+        model.add(spec.mesh);
+        spec.mesh.updateMatrixWorld(true);
+        const sBox = new THREE.Box3().setFromObject(spec.mesh);
+        const sWorldCenter = sBox.getCenter(new THREE.Vector3());
+        const explodeVec = new THREE.Vector3(sWorldCenter.x, 0, sWorldCenter.z);
+        if (explodeVec.lengthSq() < 1e-4) explodeVec.set(0.1, 0, 0.1);
+        explodeVec.normalize().multiplyScalar(0.32);
+
+        const synthId = `synth_${spec.structureId}_${spec.side}`;
+        const bilingualLabel = formatBilingualName(spec.namePl, spec.nameLt);
+
+        spec.mesh.userData = {
+          id: synthId,
+          individualId: synthId,
+          unifiedId: null,
+          anatomicalSide: spec.side,
+          namePl: spec.namePl,
+          nameLt: spec.nameLt,
+          nameEn: spec.nameEn,
+          bilingualName: bilingualLabel,
+          wholeNamePl: spec.namePl,
+          wholeNameLt: spec.nameLt,
+          wholeNameEn: spec.nameEn,
+          wholeBilingualName: bilingualLabel,
+          structureId: spec.structureId,
+          category: spec.category,
+          isCartilage: false,
+          layerId: spec.layerId,
+          tissueType: layerIdToLegacyTissueType(spec.layerId),
+          basePosition: spec.mesh.position.clone(),
+          explodeVector: explodeVec,
+          individualExplodeVector: explodeVec.clone(),
+          rawName: spec.rawName,
+        };
+
+        bumpCount(spec.layerId);
+        applyCurrentVisibilityToMesh(spec.mesh);
+        refs.interactables.push(spec.mesh);
+        refs.partMeshes.set(synthId, [spec.mesh]);
+        labels[synthId] = bilingualLabel;
+        metas.push({
+          id: synthId,
+          namePl: spec.namePl,
+          nameLt: spec.nameLt,
+          nameEn: spec.nameEn,
+          bilingualName: bilingualLabel,
+          structureId: spec.structureId,
+          category: spec.category,
+        });
+        refs.disposables.push(spec.mesh.geometry);
+        if (!Array.isArray(spec.mesh.material) && spec.mesh.material) {
+          refs.disposables.push(spec.mesh.material);
+        }
+      }
 
       // Harmonize explodeVector across unified multi-mesh structures (e.g., 3 heads of Deltoid move as 1 unit)
       for (const [, groupMeshes] of refs.partMeshes.entries()) {
@@ -2847,10 +3071,22 @@ export const AnatomyViewport3D = React.forwardRef<
                   const translated = translateMeshNameToPolish(rawTitle, targetLayerId, anatomicalX);
                   const isCartilageOverlay =
                     targetLayerId === 'ligament' &&
-                    Boolean(translated.isCartilage || /\b(disc|meniscus|labrum|cartilage)\b/i.test(rawTitle));
+                    Boolean(
+                      translated.isCartilage ||
+                        /\b(disc|meniscus|labrum|cartilage|symphysis)\b/i.test(rawTitle),
+                    );
+                  const effectiveLayerId: AnatomicalLayerId = isCartilageOverlay
+                    ? 'cartilage'
+                    : targetLayerId === 'ligament' &&
+                        /\b(sheaths?|retinaculum|retinacula)\b/i.test(rawTitle)
+                      ? 'sheath'
+                      : targetLayerId === 'ligament' &&
+                          /\b(aponeurosis|tract|linea\s+alba)\b/i.test(rawTitle)
+                        ? 'tendon'
+                        : targetLayerId;
 
                   const mat = createMaterialForLayer(
-                    targetLayerId,
+                    effectiveLayerId,
                     rawTitle,
                     ud.origMaterial,
                     skinOpacityRef.current,
@@ -2861,17 +3097,19 @@ export const AnatomyViewport3D = React.forwardRef<
 
                   const id = `ov_${overlayKey}_${meshIndex}_${rawTitle.replace(/\W+/g, '_')}`;
                   meshIndex += 1;
-                  bumpCount(targetLayerId);
+                  bumpCount(effectiveLayerId);
 
                   const explodeVec = new THREE.Vector3(worldCenter.x, 0, worldCenter.z);
                   if (explodeVec.lengthSq() < 1e-4) explodeVec.set(0.1, 0, 0.1);
                   explodeVec.normalize();
                   const explodeDist =
-                    targetLayerId === 'skin'
+                    effectiveLayerId === 'skin'
                       ? 0.55
-                      : targetLayerId === 'artery' || targetLayerId === 'vein' || targetLayerId === 'nerve'
+                      : effectiveLayerId === 'artery' ||
+                          effectiveLayerId === 'vein' ||
+                          effectiveLayerId === 'nerve'
                         ? 0.24
-                        : targetLayerId === 'organ'
+                        : effectiveLayerId === 'organ'
                           ? 0.06
                           : 0.14;
                   explodeVec.multiplyScalar(explodeDist);
@@ -2885,6 +3123,10 @@ export const AnatomyViewport3D = React.forwardRef<
                           ? 'right'
                           : undefined;
 
+                  const bilingualLabel =
+                    translated.bilingualName ||
+                    formatBilingualName(translated.namePl, translated.nameLt);
+
                   child.userData = {
                     ...child.userData,
                     id,
@@ -2892,13 +3134,14 @@ export const AnatomyViewport3D = React.forwardRef<
                     unifiedId: null,
                     anatomicalSide: overlaySide,
                     namePl: translated.namePl,
+                    nameLt: translated.nameLt,
                     nameEn: translated.nameEn,
-                    bilingualName: translated.bilingualName,
+                    bilingualName: bilingualLabel,
                     structureId: translated.structureId,
                     category: translated.category,
                     isCartilage: isCartilageOverlay,
-                    layerId: targetLayerId,
-                    tissueType: layerIdToLegacyTissueType(targetLayerId),
+                    layerId: effectiveLayerId,
+                    tissueType: layerIdToLegacyTissueType(effectiveLayerId),
                     basePosition: child.position.clone(),
                     explodeVector: explodeVec,
                     individualExplodeVector: explodeVec.clone(),
@@ -2909,13 +3152,11 @@ export const AnatomyViewport3D = React.forwardRef<
                   refs.interactables.push(child);
                   refs.partMeshes.set(id, [child]);
 
-                  const bilingualLabel =
-                    translated.bilingualName ||
-                    formatBilingualName(translated.namePl, translated.nameEn);
                   labels[id] = bilingualLabel;
                   metas.push({
                     id,
                     namePl: translated.namePl,
+                    nameLt: translated.nameLt,
                     nameEn: translated.nameEn,
                     bilingualName: bilingualLabel,
                     structureId: translated.structureId,
@@ -3114,8 +3355,9 @@ export const AnatomyViewport3D = React.forwardRef<
           onSelectPartRef.current({
             id: hitZone.id,
             namePl: hitZone.namePl,
+            nameLt: hitZone.nameLt,
             nameEn: hitZone.nameEn,
-            bilingualName: hitZone.bilingualName || formatBilingualName(hitZone.namePl, hitZone.nameEn),
+            bilingualName: hitZone.bilingualName || formatBilingualName(hitZone.namePl, hitZone.nameLt),
             structureId: resolvedId,
             category: 'bone',
             tissueType: 'bone',
@@ -3131,13 +3373,22 @@ export const AnatomyViewport3D = React.forwardRef<
           id,
           rawName,
           namePl,
+          nameLt,
           nameEn,
           bilingualName,
+          tendinousNamePl,
+          tendinousNameLt,
+          tendinousBilingualName,
           structureId,
           category,
           tissueType,
           layerId,
         } = hitObj.userData;
+        const isTendonHit =
+          hitObj instanceof THREE.Mesh &&
+          layerId === 'muscle' &&
+          Boolean(tendinousNamePl) &&
+          isRaycastHitOnTendinousPart(hitObj, primaryHit.face);
         setSelectedHotspot(null);
         if (id) {
           refs.pivotOnPart(id, primaryHit.point);
@@ -3147,13 +3398,17 @@ export const AnatomyViewport3D = React.forwardRef<
         onSelectPartRef.current({
           id,
           rawMeshName: rawName || hitObj.name,
-          namePl,
+          namePl: isTendonHit ? tendinousNamePl : namePl,
+          nameLt: isTendonHit ? tendinousNameLt || nameLt : nameLt,
           nameEn,
-          bilingualName: bilingualName || formatBilingualName(namePl, nameEn),
+          bilingualName: isTendonHit
+            ? tendinousBilingualName || formatBilingualName(tendinousNamePl, tendinousNameLt || nameLt)
+            : bilingualName || formatBilingualName(namePl, nameLt),
           structureId,
           category,
           tissueType,
           layerId,
+          isTendinousPart: isTendonHit || layerId === 'tendon',
         });
       } else {
         setSelectedHotspot(null);
@@ -3213,7 +3468,7 @@ export const AnatomyViewport3D = React.forwardRef<
         if (hideHoverLabelRef.current) {
           setHoveredName(null);
         } else {
-          const label = hitZone.bilingualName || formatBilingualName(hitZone.namePl, hitZone.nameEn);
+          const label = hitZone.bilingualName || formatBilingualName(hitZone.namePl, hitZone.nameLt);
           const typeTag =
             hitZone.type === 'pp'
               ? 'PP • Przyczep początkowy'
@@ -3227,21 +3482,35 @@ export const AnatomyViewport3D = React.forwardRef<
       }
 
       const nextHoveredId = primaryHit ? (primaryHit.object.userData.id as string) : null;
+      const hitObj = primaryHit ? primaryHit.object : null;
+      const hoverTendinous =
+        hitObj instanceof THREE.Mesh &&
+        hitObj.userData.layerId === 'muscle' &&
+        Boolean(hitObj.userData.tendinousNamePl) &&
+        isRaycastHitOnTendinousPart(hitObj, primaryHit?.face);
+
+      if (hitObj && !hideHoverLabelRef.current) {
+        const ud = hitObj.userData;
+        const desiredHoverText = hoverTendinous
+          ? (ud.tendinousBilingualName as string | undefined) ||
+            formatBilingualName(
+              (ud.tendinousNamePl as string) || '',
+              (ud.tendinousNameLt as string | undefined) || (ud.nameLt as string | undefined),
+            )
+          : (ud.bilingualName as string | undefined) ||
+            formatBilingualName((ud.namePl as string) || '', ud.nameLt as string | undefined) ||
+            (ud.namePl as string | undefined) ||
+            null;
+        setHoveredName(desiredHoverText);
+      } else if (!hitObj || hideHoverLabelRef.current) {
+        setHoveredName(null);
+      }
 
       if (nextHoveredId !== refs.hoveredId || lastHoveredHotspotId !== null || refs.hoveredLandmarkId !== null) {
         lastHoveredHotspotId = null;
         refs.hoveredLandmarkId = null;
         refs.hoveredId = nextHoveredId;
         renderer.domElement.style.cursor = nextHoveredId ? 'pointer' : 'grab';
-        const hitObj = primaryHit ? primaryHit.object : null;
-        if (hitObj && !hideHoverLabelRef.current) {
-          const ud = hitObj.userData;
-          setHoveredName(
-            ud.bilingualName || formatBilingualName(ud.namePl || '', ud.nameEn) || ud.namePl || null,
-          );
-        } else {
-          setHoveredName(null);
-        }
         applyVisualHighlights();
         requestRender();
       }
@@ -3428,7 +3697,7 @@ export const AnatomyViewport3D = React.forwardRef<
           <span>
             {customModelName
               ? `Model: ${customModelName}`
-              : REGION_TITLES[region] ?? 'Model 3D: Anatomia regionalna (Regional Anatomy)'}
+              : REGION_TITLES[region] ?? 'Model 3D: Anatomia regionalna (Anatomia topographica)'}
           </span>
           {loadingOverlayLayers && (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
@@ -4127,11 +4396,11 @@ export const AnatomyViewport3D = React.forwardRef<
         {showLayersPanel && (
           <div
             data-testid="anatomy-layers-panel"
-            className="absolute top-3 right-3 z-30 w-72 max-w-[calc(100%-1.5rem)] rounded-2xl border-2 border-emerald-600 bg-white/95 p-3.5 shadow-2xl backdrop-blur-md sm:w-80 dark:border-emerald-700 dark:bg-[#112018]/95"
+            className="absolute top-3 right-3 z-30 w-72 max-w-[calc(100%-1.5rem)] rounded-2xl border-2 border-emerald-600 bg-white/95 p-3 shadow-2xl backdrop-blur-md sm:w-80 dark:border-emerald-700 dark:bg-[#112018]/95"
           >
-            <div className="flex items-center justify-between gap-2 border-b border-[#d6e7dc] pb-2 dark:border-[#233d2f]">
+            <div className="flex items-center justify-between gap-2 border-b border-[#d6e7dc] pb-1.5 dark:border-[#233d2f]">
               <span className="text-xs font-extrabold text-[#16291f] dark:text-[#e6f2ea]">
-                Układy anatomiczne 3D
+                Układy i tkanki 3D{availableLayerCount > 0 ? ` (${availableLayerCount} w modelu)` : ''}
               </span>
               <button
                 type="button"
@@ -4144,7 +4413,7 @@ export const AnatomyViewport3D = React.forwardRef<
             </div>
 
             {/* Quick System Presets */}
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1">
               <button
                 type="button"
                 data-testid="layers-preset-all-internal"
@@ -4167,9 +4436,10 @@ export const AnatomyViewport3D = React.forwardRef<
                     bone: true,
                     cartilage: true,
                     muscle: true,
-                    bursa: true,
                     tendon: true,
+                    sheath: true,
                     ligament: true,
+                    bursa: true,
                     artery: false,
                     vein: false,
                     nerve: false,
@@ -4191,9 +4461,10 @@ export const AnatomyViewport3D = React.forwardRef<
                     bone: true,
                     cartilage: true,
                     muscle: false,
-                    bursa: false,
                     tendon: false,
+                    sheath: false,
                     ligament: false,
+                    bursa: false,
                     artery: true,
                     vein: true,
                     nerve: true,
@@ -4208,7 +4479,7 @@ export const AnatomyViewport3D = React.forwardRef<
             </div>
 
             {/* Per-System Toggle List */}
-            <div className="mt-2.5 max-h-64 space-y-1 overflow-y-auto pr-1">
+            <div className="mt-2 max-h-52 space-y-1 overflow-y-auto pr-1">
               {ANATOMY_LAYERS_META.map((layer) => {
                 const meshCount = layerMeshCounts[layer.id] ?? 0;
                 const isAvailable = meshCount > 0;
@@ -4217,7 +4488,7 @@ export const AnatomyViewport3D = React.forwardRef<
                   <label
                     key={layer.id}
                     data-testid={`layer-toggle-${layer.id}`}
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-xs transition ${
+                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-xl border px-2 py-1 text-[11px] transition ${
                       !isAvailable
                         ? 'cursor-not-allowed border-transparent opacity-45'
                         : isChecked
@@ -4241,7 +4512,7 @@ export const AnatomyViewport3D = React.forwardRef<
                         className="h-3.5 w-3.5 accent-emerald-600"
                       />
                       <span
-                        className="h-3 w-3 shrink-0 rounded-full border border-black/20 shadow-xs"
+                        className="h-3 w-3 shrink-0 rounded-full border border-black/25 shadow-xs"
                         style={{ backgroundColor: layer.swatchHex }}
                       />
                       <span className="truncate">{layer.labelPl}</span>
@@ -4377,12 +4648,13 @@ export const AnatomyViewport3D = React.forwardRef<
                   </span>
                 </div>
                 <h4 className="mt-1 text-sm font-black text-[#16291f] dark:text-[#e6f2ea]">
-                  {selectedHotspot.bilingualName ||
-                    formatBilingualName(selectedHotspot.namePl, selectedHotspot.nameEn)}
+                  {selectedHotspot.namePl}
                 </h4>
-                <p className="text-xs font-semibold text-[#52695b] dark:text-[#94b0a0]">
-                  {selectedHotspot.nameEn}
-                </p>
+                {selectedHotspot.nameLt && (
+                  <p className="text-xs font-semibold italic text-emerald-700 dark:text-emerald-300">
+                    {capitalizeLatinTerm(selectedHotspot.nameLt)}
+                  </p>
+                )}
               </div>
               <button
                 type="button"

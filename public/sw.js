@@ -10,7 +10,7 @@
  *  - Static assets (/assets/*, /favicon.svg, /manifest.webmanifest): STALE_WHILE_REVALIDATE
  */
 
-const APP_CACHE_NAME = 'physiolingo-app-v8';
+const APP_CACHE_NAME = 'physiolingo-app-v9';
 const MODELS_CACHE_NAME = 'physiolingo-models-v6';
 const ACTIVE_CACHES = [APP_CACHE_NAME, MODELS_CACHE_NAME];
 

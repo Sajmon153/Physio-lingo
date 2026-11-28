@@ -4072,7 +4072,7 @@ const EXTRA_CLINICAL_CASES_BY_LESSON: Record<string, LessonTask[]> = {
         "Naderwanie mięśnia brzuchatego łydki"
       ],
       "correctIndex": 0,
-      "explanation": "Nerw dodatkowy (CN XI) biegnie powierzchownie w trójkącie bocznym szyi i unerwia mięsień czworoboczny; jego porażenie daje opadnięty bark i boczną łopatkę skrzydłowatą (w odróżnieniu od przyśrodkowej w porażeniu n. piersiowego długiego).",
+      "explanation": "Nerw dodatkowy (n. XI) biegnie powierzchownie w trójkącie bocznym szyi i unerwia mięsień czworoboczny; jego porażenie daje opadnięty bark i boczną łopatkę skrzydłowatą (w odróżnieniu od przyśrodkowej w porażeniu n. piersiowego długiego).",
       "prompt": "Przeanalizuj opis pacjenta i wskaż najbardziej trafne rozpoznanie lub decyzję kliniczną:",
       "funFact": "Oba mięśnie lewy i prawy oglądane razem na plecach tworzą kształt geometrycznego rombu lub kaptura mnicha (stąd potoczna nazwa \"kapturowy\")."
     }

@@ -559,7 +559,26 @@ export interface StructureDetailLabels {
   secondShort: string;
 }
 
-export function getStructureDetailLabels(category: StructureCategory): StructureDetailLabels {
+export function getStructureDetailLabels(
+  category: StructureCategory,
+  structureId?: string,
+): StructureDetailLabels {
+  if (structureId === 'ossa_carpi') {
+    return {
+      firstLabel: 'Szereg bliższy nadgarstka',
+      secondLabel: 'Szereg dalszy nadgarstka',
+      firstShort: 'Szereg bliższy',
+      secondShort: 'Szereg dalszy',
+    };
+  }
+  if (structureId === 'cranium') {
+    return {
+      firstLabel: 'Podział czaszki',
+      secondLabel: 'Szwy, doły i otwory czaszki',
+      firstShort: 'Podział',
+      secondShort: 'Szwy i doły',
+    };
+  }
   switch (category) {
     case 'bone':
       return {
@@ -567,6 +586,13 @@ export function getStructureDetailLabels(category: StructureCategory): Structure
         secondLabel: 'Mięśnie przyczepiające się',
         firstShort: 'Struktury kostne',
         secondShort: 'Mięśnie',
+      };
+    case 'joint_ligament':
+      return {
+        firstLabel: 'Przyczep początkowy / Budowa',
+        secondLabel: 'Przyczep końcowy / Stabilizacja',
+        firstShort: 'Budowa',
+        secondShort: 'Stabilizacja',
       };
     case 'artery':
       return {

@@ -22,6 +22,10 @@ import { MUSCLE_ACTIONS_MAP } from '../data/muscleActionsDb';
 import type { MuscleActionProfile, MuscleKinematicPreset } from '../data/muscleActionsTypes';
 import { computeClickOrbitGoal } from '../three/cameraFocus';
 import {
+  applyMuscleMyotendinousVertexColors,
+  buildSynthesizedAnatomicalTendons,
+} from '../three/anatomyLayers';
+import {
   classifyBoneSegment,
   computeAnatomicalJointAxis,
   computeFiberBundlePoints,
@@ -237,10 +241,11 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
     rig.vectorGroup.visible = showForceVectors;
   }, [showForceVectors]);
 
-  // Update background on dark mode change
+  // Keep high-contrast dark anatomical studio background across both light & dark UI themes
+  // so pearly-white tendons (#f6f3e8), golden ligaments (#d4af5a), and ivory bones (#e8dcc4) stand out crisply
   useEffect(() => {
     if (sceneRef.current) {
-      sceneRef.current.background = new THREE.Color(isDarkMode ? 0x0c1711 : 0xf2f8f4);
+      sceneRef.current.background = new THREE.Color(isDarkMode ? 0x0b1510 : 0x111a16);
     }
   }, [isDarkMode]);
 
@@ -362,20 +367,18 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
       }
     }
 
-    // 6. Modulate physiological muscle material color & contraction sheen
+    // 6. Modulate physiological muscle material sheen while preserving per-vertex myotendinous colors
+    // (striated crimson belly <-> glistening pearly-white tendinous ends)
     const act = frame.fiberActivation;
     if (mode === 'eccentric') {
-      // Braking tension: warm terracotta-amber muscle tone
-      rig.activeMuscleMat.color.setRGB(0.76 + 0.16 * act, 0.24 + 0.12 * act, 0.14);
-      rig.activeMuscleMat.emissive.setRGB(0.32 * act, 0.1 * act, 0.02);
+      rig.activeMuscleMat.color.setRGB(1.0, 0.96 - 0.04 * act, 0.92 - 0.06 * act);
+      rig.activeMuscleMat.emissive.setRGB(0.22 * act, 0.08 * act, 0.01);
     } else if (mode === 'closed_chain') {
-      // Closed kinetic chain contraction: rich crimson muscle tone
-      rig.activeMuscleMat.color.setRGB(0.74 + 0.18 * act, 0.16 + 0.04 * act, 0.22);
-      rig.activeMuscleMat.emissive.setRGB(0.34 * act, 0.05 * act, 0.08 * act);
+      rig.activeMuscleMat.color.setRGB(1.0, 0.95 - 0.04 * act, 0.96 - 0.03 * act);
+      rig.activeMuscleMat.emissive.setRGB(0.22 * act, 0.03 * act, 0.05 * act);
     } else {
-      // Concentric contraction: resting anatomical dark red -> vivid contracting crimson
-      rig.activeMuscleMat.color.setRGB(0.72 + 0.2 * act, 0.15 + 0.03 * act, 0.2 + 0.03 * act);
-      rig.activeMuscleMat.emissive.setRGB(0.36 * act, 0.04 * act, 0.07 * act);
+      rig.activeMuscleMat.color.setRGB(1.0, 0.95 - 0.05 * act, 0.95 - 0.05 * act);
+      rig.activeMuscleMat.emissive.setRGB(0.24 * act, 0.03 * act, 0.04 * act);
     }
 
     // 7. Update optional PP-PK force vectors when enabled
@@ -481,18 +484,18 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? 0x0c1711 : 0xf2f8f4);
+    scene.background = new THREE.Color(isDarkMode ? 0x0b1510 : 0x111a16);
     sceneRef.current = scene;
 
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-    const hemi = new THREE.HemisphereLight(0xffffff, 0xc7dbd0, 0.92);
+    const hemi = new THREE.HemisphereLight(0xf6fbf8, 0x263830, 0.95);
     scene.add(hemi);
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    const keyLight = new THREE.DirectionalLight(0xfffaf2, 1.25);
     keyLight.position.set(1.5, 2.5, 2.2);
     scene.add(keyLight);
-    const rimLight = new THREE.DirectionalLight(0xd1fae5, 0.6);
+    const rimLight = new THREE.DirectionalLight(0xd1fae5, 0.65);
     rimLight.position.set(-1.8, 1.4, -1.6);
     scene.add(rimLight);
 
@@ -687,44 +690,47 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
         const root = new THREE.Group();
 
         const boneMaterialProximal = new THREE.MeshStandardMaterial({
-          color: 0xe4dac6,
-          roughness: 0.48,
-          metalness: 0.05,
+          color: 0xe2d5be,
+          roughness: 0.68,
+          metalness: 0.03,
           side: THREE.DoubleSide,
         });
         const boneMaterialDistal = new THREE.MeshStandardMaterial({
-          color: 0xf4ecdc,
-          roughness: 0.42,
-          metalness: 0.07,
+          color: 0xefe4cf,
+          roughness: 0.62,
+          metalness: 0.04,
           side: THREE.DoubleSide,
         });
-        // Rich, 100% opaque anatomical striated muscle material (active head/akton)
+        // Rich, 100% opaque anatomical striated muscle material driven by per-vertex myotendinous colors
         const activeMuscleMat = new THREE.MeshStandardMaterial({
-          color: 0xc82838,
-          emissive: 0x3b0710,
-          emissiveIntensity: 0.55,
-          roughness: 0.44,
-          metalness: 0.06,
+          color: 0xffffff,
+          vertexColors: true,
+          emissive: 0x180406,
+          emissiveIntensity: 0.45,
+          roughness: 0.42,
+          metalness: 0.05,
           side: THREE.DoubleSide,
         });
         // Passive neighboring heads/aktony of the same muscle (follow the bone in calm resting tone)
         const passiveMuscleMat = new THREE.MeshStandardMaterial({
-          color: 0x994247,
-          emissive: 0x1e080a,
-          emissiveIntensity: 0.25,
-          roughness: 0.58,
-          metalness: 0.04,
+          color: 0xd8cdce,
+          vertexColors: true,
+          emissive: 0x0c0304,
+          emissiveIntensity: 0.2,
+          roughness: 0.56,
+          metalness: 0.03,
           side: THREE.DoubleSide,
         });
-        // Stretching antagonist muscle material (distinct rose-plum / muted terracotta)
+        // Stretching antagonist muscle material (muted rose-plum with visible tendinous ends)
         const antagonistMat = new THREE.MeshStandardMaterial({
-          color: 0x8a5a68,
-          emissive: 0x241018,
-          emissiveIntensity: 0.25,
-          roughness: 0.55,
-          metalness: 0.04,
+          color: 0xc2adb5,
+          vertexColors: true,
+          emissive: 0x16090e,
+          emissiveIntensity: 0.2,
+          roughness: 0.54,
+          metalness: 0.03,
           transparent: true,
-          opacity: 0.84,
+          opacity: 0.8,
           side: THREE.DoubleSide,
         });
 
@@ -852,6 +858,60 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
               }
             }
           });
+
+          // Synthesize sculpted Achilles / Quadriceps / Patellar tendons when simulating triceps surae or quadriceps!
+          if (
+            profile.muscleId === 'm_gastrocnemius' ||
+            profile.muscleId === 'm_soleus' ||
+            profile.muscleId === 'm_quadriceps_femoris' ||
+            chosenAntagonistId === 'm_gastrocnemius' ||
+            chosenAntagonistId === 'm_soleus' ||
+            chosenAntagonistId === 'm_quadriceps_femoris'
+          ) {
+            const synthSpecs = buildSynthesizedAnatomicalTendons(tmpl);
+            for (const spec of synthSpecs) {
+              if (spec.side !== 'right') continue;
+              const isAchilles = spec.structureId === 'achilles_tendon';
+              const isKneeExtensor =
+                spec.structureId === 'tendon_quadriceps' || spec.structureId === 'lig_patellae';
+              const belongsToAgonist =
+                (isAchilles &&
+                  (profile.muscleId === 'm_gastrocnemius' || profile.muscleId === 'm_soleus')) ||
+                (isKneeExtensor && profile.muscleId === 'm_quadriceps_femoris');
+              const belongsToAntagonist =
+                (isAchilles &&
+                  (chosenAntagonistId === 'm_gastrocnemius' || chosenAntagonistId === 'm_soleus')) ||
+                (isKneeExtensor && chosenAntagonistId === 'm_quadriceps_femoris');
+
+              if (belongsToAgonist) {
+                spec.mesh.geometry.computeBoundingBox();
+                if (spec.mesh.geometry.boundingBox) {
+                  matchedMuscleBox.union(
+                    spec.mesh.geometry.boundingBox.clone().applyMatrix4(tmpl.matrixWorld),
+                  );
+                }
+                rawAgonistSources.push({
+                  geometry: spec.mesh.geometry,
+                  matrixWorld: tmpl.matrixWorld.clone(),
+                  isActiveSubpart: true,
+                  name: spec.rawName,
+                });
+                disposables.push(spec.mesh.geometry);
+              } else if (belongsToAntagonist) {
+                rawAntagonistSources.push({
+                  geometry: spec.mesh.geometry,
+                  matrixWorld: tmpl.matrixWorld.clone(),
+                  name: spec.rawName,
+                });
+                disposables.push(spec.mesh.geometry);
+              } else {
+                spec.mesh.geometry.dispose();
+              }
+              if (!Array.isArray(spec.mesh.material) && spec.mesh.material) {
+                spec.mesh.material.dispose();
+              }
+            }
+          }
         }
 
         // Ensure at least one agonist part is marked active if subpart pattern was narrower
@@ -976,9 +1036,61 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
             posAttr.setUsage(THREE.DynamicDrawUsage);
             dynGeom.setAttribute('position', posAttr);
             dynGeom.computeVertexNormals();
-            disposables.push(dynGeom);
 
             const isAct = src.isActiveSubpart ?? true;
+            if (/\bpatellar\s+ligament\b/i.test(src.name)) {
+              const vCount = posAttr.count;
+              const cols = new Float32Array(vCount * 3);
+              const ligCol = new THREE.Color(0xd4af5a);
+              for (let k = 0; k < vCount; k++) {
+                cols[k * 3] = ligCol.r;
+                cols[k * 3 + 1] = ligCol.g;
+                cols[k * 3 + 2] = ligCol.b;
+              }
+              dynGeom.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+            } else if (/\b(calcaneal\s+tendon|quadriceps.*tendon)\b/i.test(src.name)) {
+              const vCount = posAttr.count;
+              const cols = new Float32Array(vCount * 3);
+              const tendCol = new THREE.Color(0xf6f3e8);
+              for (let k = 0; k < vCount; k++) {
+                cols[k * 3] = tendCol.r;
+                cols[k * 3 + 1] = tendCol.g;
+                cols[k * 3 + 2] = tendCol.b;
+              }
+              dynGeom.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+            } else if (/tensor\s+fasciae\s+latae/i.test(src.name)) {
+              // Upper 38% is fleshy TFL crimson belly, lower 62% is pearly Tractus iliotibialis!
+              const vCount = posAttr.count;
+              const cols = new Float32Array(vCount * 3);
+              let minY = Infinity;
+              let maxY = -Infinity;
+              for (let k = 0; k < vCount; k++) {
+                const y = posAttr.getY(k);
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+              const spanY = Math.max(0.05, maxY - minY);
+              const bellyCol = new THREE.Color(0xb62b28);
+              const tendCol = new THREE.Color(0xf6f3e8);
+              const tmp = new THREE.Color();
+              for (let k = 0; k < vCount; k++) {
+                const fromTop = (maxY - posAttr.getY(k)) / spanY;
+                const wTend =
+                  fromTop < 0.08
+                    ? 1 - fromTop / 0.08
+                    : fromTop > 0.34
+                      ? Math.min(1, (fromTop - 0.34) / 0.14)
+                      : 0;
+                tmp.copy(bellyCol).lerp(tendCol, wTend);
+                cols[k * 3] = tmp.r;
+                cols[k * 3 + 1] = tmp.g;
+                cols[k * 3 + 2] = tmp.b;
+              }
+              dynGeom.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+            } else {
+              applyMuscleMyotendinousVertexColors(dynGeom, src.name, isAct ? 0 : 2);
+            }
+            disposables.push(dynGeom);
             const mat = isAntagonist
               ? antagonistMat
               : isAct
@@ -1308,7 +1420,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
     >
       {/* Top Presets Bar (when muscle has multiple simulated movements / aktony) */}
       {!maskedQuizMode && profile.kinematicPresets.length > 1 && (
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[#d6e7dc] bg-[#f4faf6] px-3 py-2 no-scrollbar dark:border-[#233d2f] dark:bg-[#15281e]">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[#d6e7dc] bg-[#f4faf6] px-3 py-2 dark:border-[#233d2f] dark:bg-[#15281e]">
           <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider text-[#52695b] dark:text-[#94b0a0]">
             Symulowany ruch ({profile.kinematicPresets.length}):
           </span>
@@ -1320,7 +1432,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
                 type="button"
                 data-testid={`sim-preset-${preset.id}`}
                 onClick={() => onSelectPreset?.(preset.id)}
-                className={`shrink-0 rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
+                className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
                   selected
                     ? 'border-emerald-500 bg-emerald-600 text-white shadow-xs'
                     : 'border-[#c5dfd0] bg-white text-[#233d2f] hover:bg-emerald-50 dark:border-[#2a4a39] dark:bg-[#112018] dark:text-[#c7dbcf] dark:hover:bg-[#1c3527]'
@@ -1333,41 +1445,41 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
         </div>
       )}
 
-      {/* 3D WebGL Viewport */}
+      {/* 3D WebGL Viewport (Dark High-Contrast Studio) */}
       <div
-        className={`relative w-full select-none ${
-          compact ? 'h-[260px] sm:h-[310px]' : 'h-[310px] sm:h-[395px]'
+        className={`relative w-full select-none bg-[#111a16] dark:bg-[#0b1510] ${
+          compact ? 'h-[260px] sm:h-[310px]' : 'h-[320px] sm:h-[405px]'
         }`}
       >
         <div ref={containerRef} className="h-full w-full" />
 
         {/* Live SFTR Angle, Plane & Muscle Strain HUD (top-left) */}
-        <div className="pointer-events-none absolute top-2.5 left-2.5 flex max-w-[78%] flex-col gap-1">
-          <div className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-[#d6e7dc]/90 bg-white/92 px-2.5 py-1 text-[11px] font-extrabold text-emerald-950 shadow-xs backdrop-blur-sm dark:border-[#2a4a39] dark:bg-[#0d1912]/92 dark:text-emerald-100">
+        <div className="pointer-events-none absolute top-2.5 left-2.5 flex max-w-[82%] flex-col gap-1">
+          <div className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-[#0d1912]/90 px-2.5 py-1 text-[11px] font-extrabold text-emerald-100 shadow-sm backdrop-blur-sm">
             <span
               className={`h-2 w-2 shrink-0 rounded-full ${
                 simMode === 'eccentric'
-                  ? 'bg-amber-500'
+                  ? 'bg-amber-400'
                   : simMode === 'closed_chain'
-                    ? 'bg-emerald-500'
-                    : 'bg-rose-600'
+                    ? 'bg-emerald-400'
+                    : 'bg-rose-500'
               }`}
             />
             <span ref={angleBadgeRef} className="shrink-0 whitespace-nowrap font-mono-tabular">
               0°
             </span>
-            <span className="text-[#52695b] dark:text-[#94b0a0]">•</span>
+            <span className="text-[#94b0a0]">•</span>
             <span className="truncate">{activePreset.planePl}</span>
           </div>
           {!maskedQuizMode && (
             <div className="flex flex-wrap items-center gap-1">
-              <span className="w-fit rounded-lg bg-white/88 px-2 py-0.5 text-[10px] font-bold text-[#354c3f] shadow-xs backdrop-blur-sm dark:bg-[#0d1912]/88 dark:text-[#c7dbcf]">
+              <span className="w-fit rounded-lg border border-emerald-500/20 bg-[#0d1912]/88 px-2 py-0.5 text-[10px] font-bold text-[#c7dbcf] shadow-xs backdrop-blur-sm">
                 {activePreset.axisPl} • {activePreset.sftrLabel}
               </span>
               <span
                 ref={strainBadgeRef}
                 data-testid="sim-strain-badge"
-                className="w-fit rounded-lg bg-rose-50/95 px-2 py-0.5 font-mono-tabular text-[10px] font-extrabold text-rose-800 shadow-xs backdrop-blur-sm dark:bg-rose-950/85 dark:text-rose-200"
+                className="w-fit rounded-lg border border-rose-500/35 bg-rose-950/88 px-2 py-0.5 font-mono-tabular text-[10px] font-extrabold text-rose-200 shadow-xs backdrop-blur-sm"
               >
                 Skrócenie brzuśca: 0%
               </span>
@@ -1381,7 +1493,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
             type="button"
             title="Wyśrodkuj widok 3D"
             onClick={handleRecenter}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#c5dfd0] bg-white/90 text-emerald-900 shadow-xs backdrop-blur-sm transition hover:bg-emerald-50 dark:border-[#2a4a39] dark:bg-[#112018]/90 dark:text-emerald-200"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-500/35 bg-[#0d1912]/88 text-emerald-200 shadow-sm backdrop-blur-sm transition hover:bg-emerald-600/40"
           >
             <Crosshair className="h-4 w-4" />
           </button>
@@ -1393,7 +1505,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
                 : 'Dotyk: Przesuwanie (kliknij, aby przełączyć na Obrót)'
             }
             onClick={() => setTouchMode((m) => (m === 'rotate' ? 'pan' : 'rotate'))}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#c5dfd0] bg-white/90 text-emerald-900 shadow-xs backdrop-blur-sm transition hover:bg-emerald-50 dark:border-[#2a4a39] dark:bg-[#112018]/90 dark:text-emerald-200"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-500/35 bg-[#0d1912]/88 text-emerald-200 shadow-sm backdrop-blur-sm transition hover:bg-emerald-600/40"
           >
             {touchMode === 'rotate' ? <Rotate3d className="h-4 w-4" /> : <Move className="h-4 w-4" />}
           </button>
@@ -1401,34 +1513,37 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
 
         {/* Legend pills (bottom-left) */}
         <div className="pointer-events-none absolute bottom-2 left-2.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
-          <span className="inline-flex items-center gap-1 rounded-lg bg-white/88 px-1.5 py-0.5 text-rose-800 backdrop-blur-sm dark:bg-[#0d1912]/88 dark:text-rose-300">
-            <span className="h-2 w-2 rounded-full bg-rose-600" /> Aktywny brzusiec 3D
+          <span className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-[#0d1912]/88 px-1.5 py-0.5 text-rose-200 backdrop-blur-sm">
+            <span className="h-2 w-2 rounded-full bg-[#b82e2a]" /> Brzusiec mięśniowy
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200/30 bg-[#0d1912]/88 px-1.5 py-0.5 text-[#f6f3e8] backdrop-blur-sm">
+            <span className="h-2 w-2 rounded-full border border-white/40 bg-[#f6f3e8]" /> Część ścięgnista
           </span>
           {showAntagonist && availableAntagonistPl && !maskedQuizMode && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-white/88 px-1.5 py-0.5 text-stone-700 backdrop-blur-sm dark:bg-[#0d1912]/88 dark:text-stone-300">
+            <span className="inline-flex items-center gap-1 rounded-lg border border-stone-500/30 bg-[#0d1912]/88 px-1.5 py-0.5 text-stone-200 backdrop-blur-sm">
               <span className="h-2 w-2 rounded-full bg-[#8a5a68]" /> Rozciągany: {availableAntagonistPl}
             </span>
           )}
           {showPlaneAndAxis && !maskedQuizMode && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-white/88 px-1.5 py-0.5 text-amber-800 backdrop-blur-sm dark:bg-[#0d1912]/88 dark:text-amber-300">
-              <span className="h-2 w-2 rounded-full bg-amber-500" /> Oś i płaszczyzna ruchu
+            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-[#0d1912]/88 px-1.5 py-0.5 text-amber-200 backdrop-blur-sm">
+              <span className="h-2 w-2 rounded-full bg-amber-400" /> Oś i płaszczyzna ruchu
             </span>
           )}
         </div>
 
         {/* Loading / Fallback Overlay */}
         {(isLoading || loadError || webglUnavailable) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#f2f8f4]/90 p-4 text-center dark:bg-[#0c1711]/90">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#111a16]/92 p-4 text-center dark:bg-[#0b1510]/92">
             {webglUnavailable ? (
-              <p className="text-xs font-bold text-[#354c3f] dark:text-[#c7dbcf]">
+              <p className="text-xs font-bold text-[#c7dbcf]">
                 Podgląd WebGL 3D niedostępny w tym środowisku — pełny opis kinematyki dostępny poniżej.
               </p>
             ) : loadError ? (
-              <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{loadError}</p>
+              <p className="text-xs font-bold text-rose-400">{loadError}</p>
             ) : (
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-                <span>Wiązanie przyczepów PP/PK bryły mięśnia 3D z kośćmi…</span>
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
+                <span>Wiązanie przyczepów PP/PK i części ścięgnistych 3D z kośćmi…</span>
               </div>
             )}
           </div>
@@ -1497,7 +1612,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
         {/* Row 2 & 3: Physiological Mode + 3D Scene Layer Helpers (Hidden in maskedQuizMode) */}
         {!maskedQuizMode && (
           <>
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5">
               {(
                 [
                   {
@@ -1525,7 +1640,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
                   type="button"
                   data-testid={`sim-mode-${m.id}`}
                   onClick={() => setSimMode(m.id)}
-                  className={`shrink-0 rounded-xl border px-2.5 py-1.5 text-[11px] font-extrabold transition ${
+                  className={`rounded-xl border px-2.5 py-1.5 text-[11px] font-extrabold transition ${
                     simMode === m.id
                       ? m.activeCls
                       : 'border-[#d6e7dc] bg-white text-[#52695b] hover:bg-[#edf6f0] dark:border-[#233d2f] dark:bg-[#0f1d15] dark:text-[#94b0a0]'
@@ -1537,7 +1652,7 @@ export const MuscleMotionSimulator3D: React.FC<MuscleMotionSimulator3DProps> = (
             </div>
 
             {/* Row 3: 3D Helpers — Plane & Axis | Stretching Antagonist | Force Vectors PP–PK */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 data-testid="sim-plane-toggle"

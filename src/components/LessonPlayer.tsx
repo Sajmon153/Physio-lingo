@@ -87,10 +87,10 @@ function resolveTaskModelTarget(
 }
 
 function formatSelectedPartLabel(part: SelectedPartInfo): string {
-  const en =
-    part.nameEn?.trim() ||
-    (part.structureId ? ANATOMY_MAP[part.structureId]?.nameEn : undefined);
-  if (en) return formatBilingualName(part.namePl, en);
+  const lt =
+    part.nameLt?.trim() ||
+    (part.structureId ? ANATOMY_MAP[part.structureId]?.nameLt : undefined);
+  if (lt) return formatBilingualName(part.namePl, lt);
   if (part.bilingualName && part.bilingualName.trim()) return part.bilingualName.trim();
   return part.namePl;
 }
@@ -358,9 +358,8 @@ export const LessonPlayer: React.FC<LessonPlayerProps> = ({
           selected3DPart.rawMeshName!.toLowerCase() === currentTask.targetMeshId.toLowerCase()) ||
         selected3DPart.structureId === currentTask.structureId ||
         normSelectedPl === normTargetPl;
-      const targetEn =
-        currentTask.targetNameEn ?? ANATOMY_MAP[currentTask.structureId]?.nameEn;
-      correctAnswerText = formatBilingualName(currentTask.targetNamePl, targetEn);
+      const targetLt = ANATOMY_MAP[currentTask.structureId]?.nameLt;
+      correctAnswerText = formatBilingualName(currentTask.targetNamePl, targetLt);
     }
 
     setTotalChecks((c) => c + 1);

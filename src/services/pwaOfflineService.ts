@@ -6,7 +6,7 @@
  * dermatomes, biomechanics, and clinical cases without internet access.
  */
 
-export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v8';
+export const PHYSIOLINGO_APP_CACHE = 'physiolingo-app-v9';
 export const PHYSIOLINGO_MODELS_CACHE = 'physiolingo-models-v6';
 
 export type OfflinePackId =

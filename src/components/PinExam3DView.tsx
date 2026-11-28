@@ -144,7 +144,7 @@ const POOL_OPTIONS: Array<{ id: PinExamPool; label: string; desc: string }> = [
   {
     id: 'connective',
     label: 'Więzadła, kaletki i ścięgna',
-    desc: 'Białe struktury łącznotkankowe: kaletki maziowe, pochewki i więzadła',
+    desc: 'Złociste więzadła, perłowe ścięgna, lazurowe pochewki i fioletowe kaletki maziowe',
   },
   {
     id: 'organs',
@@ -152,6 +152,23 @@ const POOL_OPTIONS: Array<{ id: PinExamPool; label: string; desc: string }> = [
     desc: 'Serce, płuca, wątroba, żołądek, nerki i trzewia (Tułów / Całe ciało)',
   },
 ];
+
+function getPinQuestionCategoryBadge(q: PinExamQuestion): string {
+  if (q.kind === 'landmark') return 'Punkt kostny / Przyczep';
+  const cat = ANATOMY_MAP[q.structureId]?.category;
+  if (cat === 'artery') return 'Tętnica';
+  if (cat === 'vein') return 'Żyła';
+  if (q.systemGroup === 'vessels') return 'Tętnica / Żyła';
+  if (cat === 'nerve' || q.systemGroup === 'nerves') return 'Nerw / Układ nerwowy';
+  if (cat === 'organ' || q.systemGroup === 'organs') return 'Narząd wewnętrzny';
+  if (cat === 'bursa') return 'Kaletka maziowa';
+  if (cat === 'tendon') return 'Ścięgno / Pochewka';
+  if (cat === 'ligament' || cat === 'joint_ligament' || q.systemGroup === 'connective') {
+    return 'Więzadło / Aparat stawowy';
+  }
+  if (cat === 'bone') return 'Kość';
+  return 'Mięsień';
+}
 
 const QUESTION_COUNTS = [5, 10, 15] as const;
 
@@ -289,6 +306,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
         muscle: false,
         bursa: false,
         tendon: false,
+        sheath: false,
         ligament: false,
         artery: true,
         vein: true,
@@ -304,6 +322,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
         muscle: false,
         bursa: false,
         tendon: false,
+        sheath: false,
         ligament: false,
         artery: false,
         vein: false,
@@ -319,6 +338,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
         muscle: false,
         bursa: true,
         tendon: true,
+        sheath: true,
         ligament: true,
         artery: false,
         vein: false,
@@ -334,6 +354,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
         muscle: false,
         bursa: false,
         tendon: false,
+        sheath: false,
         ligament: false,
         artery: false,
         vein: false,
@@ -348,6 +369,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
       muscle: true,
       bursa: true,
       tendon: true,
+      sheath: true,
       ligament: false,
       artery: false,
       vein: false,
@@ -700,7 +722,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
     if (hubMode === 'locate') {
       isCorrect = !timedOut && evaluatePinExamAnswer(currentQuestion, selectedPart);
       selectedLabel = selectedPart
-        ? formatBilingualName(selectedPart.namePl, selectedPart.nameEn)
+        ? selectedPart.bilingualName || formatBilingualName(selectedPart.namePl, selectedPart.nameLt)
         : null;
     } else if (hubMode === 'identify') {
       if (reverseFormat === 'abcd') {
@@ -2281,7 +2303,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                   >
                     <Box className="h-4 w-4" />
                     <span>
-                      Pokaż w 3D: {formatBilingualName(linkedStructure.namePl, linkedStructure.nameEn)}
+                      Pokaż w 3D: {formatBilingualName(linkedStructure.namePl, linkedStructure.nameLt)}
                     </span>
                   </button>
                 </div>
@@ -2662,7 +2684,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                   <div>
                     <div className="text-sm font-bold text-emerald-950 dark:text-white">
                       {idx + 1}.{' '}
-                      {formatBilingualName(item.question.targetNamePl, item.question.targetNameEn)}
+                      {formatBilingualName(item.question.targetNamePl, item.question.targetNameLt)}
                     </div>
                     {!item.isCorrect && (
                       <div className="text-xs text-rose-700 dark:text-rose-300">
@@ -2717,7 +2739,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
   return (
     <div
       data-testid={isReverse ? 'reverse-pin-exam-active' : 'pin-exam-active'}
-      className="mx-auto w-full max-w-6xl space-y-4 pb-24 md:pb-8"
+      className="mx-auto w-full max-w-6xl space-y-3 pt-1 pb-24 md:pb-8"
     >
       {/* Top Progress Strip */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-[#d6e7dc] bg-white px-4 py-3 dark:border-[#233d2f] dark:bg-[#112018]">
@@ -2777,17 +2799,13 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
 
       {/* Question Prompt Card */}
       {currentQuestion && (
-        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 px-5 py-3.5 dark:border-emerald-800 dark:bg-emerald-950/40">
+        <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 px-5 py-3 dark:border-emerald-800 dark:bg-emerald-950/40">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                 {isReverse
-                  ? currentQuestion.kind === 'landmark'
-                    ? 'Odwrócona szpilka 3D • Punkt kostny'
-                    : 'Odwrócona szpilka 3D • Mięsień'
-                  : currentQuestion.kind === 'landmark'
-                    ? 'Szpilka 3D • Punkt kostny'
-                    : 'Szpilka 3D • Mięsień'}
+                  ? `Odwrócona szpilka 3D • ${getPinQuestionCategoryBadge(currentQuestion)}`
+                  : `Szpilka 3D • ${getPinQuestionCategoryBadge(currentQuestion)}`}
               </div>
               <h2
                 data-testid="pin-exam-prompt"
@@ -2850,8 +2868,8 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                 )}
                 <span>
                   {questionState === 'correct'
-                    ? `Perfekcyjnie! +15 XP — ${formatBilingualName(currentQuestion.targetNamePl, currentQuestion.targetNameEn)}`
-                    : `Poprawna nazwa podświetlonej struktury: ${formatBilingualName(currentQuestion.targetNamePl, currentQuestion.targetNameEn)}`}
+                    ? `Perfekcyjnie! +15 XP — ${formatBilingualName(currentQuestion.targetNamePl, currentQuestion.targetNameLt)}`
+                    : `Poprawna nazwa podświetlonej struktury: ${formatBilingualName(currentQuestion.targetNamePl, currentQuestion.targetNameLt)}`}
                 </span>
               </div>
               {currentQuestion.clinicalHint && (
@@ -2889,15 +2907,15 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
         highlightMode={
           questionState === 'correct' ? 'correct' : questionState === 'wrong' ? 'wrong' : 'neutral'
         }
-        heightClassName={isReverse ? 'h-[360px] sm:h-[420px]' : 'h-[440px] sm:h-[510px]'}
+        heightClassName={isReverse ? 'h-[290px] sm:h-[340px]' : 'h-[430px] sm:h-[500px]'}
         isDarkMode={isDarkMode}
       />
 
       {/* Answer Panel for Reverse Mode OR Pin Status Bar for Locate Mode */}
       {isReverse ? (
-        <div className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-4 dark:border-[#233d2f] dark:bg-[#112018]">
+        <div className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-3.5 dark:border-[#233d2f] dark:bg-[#112018]">
           {reverseFormat === 'abcd' ? (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {reverseOptions.map((opt, idx) => {
                 const isSelected = selectedReverseOptionIdx === idx;
                 const showCorrect = questionState !== 'answering' && opt.isCorrect;
@@ -2910,7 +2928,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                     data-testid={`reverse-option-${idx}`}
                     disabled={questionState !== 'answering'}
                     onClick={() => setSelectedReverseOptionIdx(idx)}
-                    className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 px-4 py-3 text-left text-sm font-bold transition ${
+                    className={`flex items-center gap-3 rounded-2xl border-2 border-b-4 px-3.5 py-2.5 text-left text-sm font-bold transition ${
                       showCorrect
                         ? 'border-emerald-600 bg-emerald-100 text-emerald-950 dark:border-emerald-500 dark:bg-emerald-950/70 dark:text-emerald-100'
                         : showWrong
@@ -2934,7 +2952,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                 htmlFor="reverse-pin-typing"
                 className="block text-xs font-extrabold uppercase tracking-wider text-[#52695b] dark:text-[#94b0a0]"
               >
-                Wpisz nazwę podświetlonej struktury (po polsku lub angielsku):
+                Wpisz nazwę podświetlonej struktury (po polsku lub po łacinie):
               </label>
               <input
                 id="reverse-pin-typing"
@@ -2943,7 +2961,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
                 disabled={questionState !== 'answering'}
                 value={reverseTypingInput}
                 onChange={(e) => setReverseTypingInput(e.target.value)}
-                placeholder="Np. mięsień nadgrzebieniowy lub guzek większy..."
+                placeholder="Np. mięsień nadgrzebieniowy lub musculus supraspinatus..."
                 className="w-full rounded-xl border-2 border-[#d6e7dc] bg-[#f4faf6] px-4 py-3 text-sm font-semibold text-emerald-950 placeholder:text-[#6b8274] focus:border-emerald-500 focus:outline-none dark:border-[#294737] dark:bg-[#182b21] dark:text-white"
               />
             </div>
@@ -2956,7 +2974,7 @@ export const PinExam3DView: React.FC<PinExam3DViewProps> = ({
             <span className="font-extrabold text-emerald-700 dark:text-emerald-300">
               {questionState === 'answering'
                 ? 'Szpilka wbita — kliknij „Zatwierdź szpilkę”, aby sprawdzić odpowiedź'
-                : `Zaznaczono: ${formatBilingualName(selectedPart.namePl, selectedPart.nameEn)}`}
+                : `Zaznaczono: ${selectedPart.bilingualName || formatBilingualName(selectedPart.namePl, selectedPart.nameLt)}`}
             </span>
           ) : (
             <span className="italic text-[#6b8274]">

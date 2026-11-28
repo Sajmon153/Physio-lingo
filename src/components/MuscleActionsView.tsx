@@ -38,6 +38,7 @@ import {
   type MuscleQuizQuestionKind,
 } from '../data/muscleActionsDb';
 import type { AnatomicalStructure, PinExamHistoryEntry } from '../types/anatomy';
+import { capitalizeLatinTerm } from '../three/anatomyTranslator';
 import { getLocalDateKey } from '../utils/gameLogic';
 import { MuscleMotionSimulator3D } from './MuscleMotionSimulator3D';
 
@@ -101,6 +102,7 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
       const anat = ANATOMY_MAP[profile.muscleId];
       const hay = [
         anat?.namePl ?? '',
+        anat?.nameLt ?? '',
         anat?.nameEn ?? '',
         ...(anat?.aliases ?? []),
         anat?.innervation ?? '',
@@ -250,7 +252,7 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
         </div>
 
         {/* 3-Tab Sub-Navigation */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar sm:shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
           {(
             [
               { id: 'encyclopedia', label: 'Encyklopedia & 3D', icon: BookOpen },
@@ -298,11 +300,11 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
                 className="w-full rounded-xl border-2 border-[#d6e7dc] bg-[#f8fcfa] py-2 pr-3 pl-9 text-sm font-semibold text-emerald-950 outline-none transition focus:border-emerald-500 dark:border-[#233d2f] dark:bg-[#0d1912] dark:text-white"
               />
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setRegionFilter('all')}
-                className={`shrink-0 rounded-xl border px-2.5 py-1 text-xs font-extrabold transition ${
+                className={`rounded-xl border px-2.5 py-1 text-xs font-extrabold transition ${
                   regionFilter === 'all'
                     ? 'border-emerald-500 bg-emerald-600 text-white'
                     : 'border-[#d6e7dc] bg-[#f4faf6] text-[#354c3f] hover:bg-emerald-50 dark:border-[#233d2f] dark:bg-[#16291f] dark:text-[#c7dbcf]'
@@ -318,7 +320,7 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
                     key={grp}
                     type="button"
                     onClick={() => setRegionFilter(grp)}
-                    className={`shrink-0 rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
+                    className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
                       active
                         ? 'border-emerald-500 bg-emerald-600 text-white'
                         : 'border-[#d6e7dc] bg-[#f4faf6] text-[#354c3f] hover:bg-emerald-50 dark:border-[#233d2f] dark:bg-[#16291f] dark:text-[#c7dbcf]'
@@ -333,8 +335,8 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
 
           {/* Main 2-Column Workspace */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[310px_minmax(0,1fr)]">
-            {/* Left Sidebar: Muscle List (Compact horizontal/collapsible picker on mobile, tall list on desktop) */}
-            <aside className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-2.5 dark:border-[#233d2f] dark:bg-[#112018]">
+            {/* Left Sidebar: Muscle List (Compact picker on mobile, sticky tall list on desktop) */}
+            <aside className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-2.5 lg:sticky lg:top-20 lg:self-start dark:border-[#233d2f] dark:bg-[#112018]">
               <div className="mb-2 flex items-center justify-between px-1">
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#52695b] dark:text-[#94b0a0]">
                   Lista mięśni ({filteredMuscles.length})
@@ -385,6 +387,11 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
                             </span>
                           )}
                         </div>
+                        {anat?.nameLt && (
+                          <div className="truncate text-[10px] font-medium italic text-emerald-700/85 dark:text-emerald-300/85">
+                            {capitalizeLatinTerm(anat.nameLt)}
+                          </div>
+                        )}
                         <div className="mt-0.5 truncate text-[11px] font-semibold text-[#52695b] dark:text-[#94b0a0]">
                           {primaryAct?.movementLabelPl ?? profile.shortTaglinePl}
                         </div>
@@ -399,76 +406,79 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
             <div className="min-w-0 space-y-4">
               {/* Muscle Identity Header */}
               <div className="rounded-2xl border-2 border-[#d6e7dc] bg-white p-4 dark:border-[#233d2f] dark:bg-[#112018]">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        {selectedProfile.regionGroupPl}
-                      </span>
-                      <span
-                        className={`rounded-lg px-2 py-0.5 text-[11px] font-extrabold ${
-                          selectedProfile.biarticular
-                            ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300'
-                            : 'bg-[#ebf5ee] text-[#354c3f] dark:bg-[#1b3125] dark:text-[#c7dbcf]'
-                        }`}
-                      >
-                        {selectedProfile.biarticular ? 'Mięsień dwustawowy / wielostawowy' : 'Mięsień jednostawowy'}
-                      </span>
-                      {selectedAnatomy?.spinalSegments && (
-                        <span className="rounded-lg bg-rose-100 px-2 py-0.5 font-mono-tabular text-[11px] font-extrabold text-rose-800 dark:bg-rose-950/70 dark:text-rose-300">
-                          {selectedAnatomy.spinalSegments}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          {selectedProfile.regionGroupPl}
                         </span>
-                      )}
+                        <span
+                          className={`rounded-lg px-2 py-0.5 text-[11px] font-extrabold ${
+                            selectedProfile.biarticular
+                              ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300'
+                              : 'bg-[#ebf5ee] text-[#354c3f] dark:bg-[#1b3125] dark:text-[#c7dbcf]'
+                          }`}
+                        >
+                          {selectedProfile.biarticular ? 'Mięsień dwustawowy / wielostawowy' : 'Mięsień jednostawowy'}
+                        </span>
+                        {selectedAnatomy?.spinalSegments && (
+                          <span className="rounded-lg bg-rose-100 px-2 py-0.5 font-mono-tabular text-[11px] font-extrabold text-rose-800 dark:bg-rose-950/70 dark:text-rose-300">
+                            {selectedAnatomy.spinalSegments}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedAnatomy && (
+                          <button
+                            type="button"
+                            onClick={() => onShowIn3D(selectedAnatomy)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-emerald-700 bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white transition hover:bg-emerald-500"
+                          >
+                            <Box className="h-3.5 w-3.5" />
+                            <span>Eksplorator 3D</span>
+                          </button>
+                        )}
+                        {selectedLovettTest && onVisualizeClinicalTest && (
+                          <button
+                            type="button"
+                            onClick={() => onVisualizeClinicalTest(selectedLovettTest)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-extrabold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
+                          >
+                            <Stethoscope className="h-3.5 w-3.5" />
+                            <span>Test Lovetta</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompareIdA(selectedProfile.muscleId);
+                            if (selectedProfile.antagonistIds[0]) {
+                              setCompareIdB(selectedProfile.antagonistIds[0]);
+                            }
+                            setSubTab('reverse');
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#c5dfd0] bg-[#f4faf6] px-3 py-1.5 text-xs font-extrabold text-emerald-900 transition hover:bg-emerald-50 dark:border-[#2a4a39] dark:bg-[#16291f] dark:text-emerald-200"
+                        >
+                          <ArrowLeftRight className="h-3.5 w-3.5" />
+                          <span>Porównaj</span>
+                        </button>
+                      </div>
                     </div>
-                    <h2 className="mt-1.5 font-display text-xl font-extrabold text-emerald-950 sm:text-2xl dark:text-white">
+
+                    <h2 className="mt-2 font-display text-xl font-extrabold text-emerald-950 sm:text-2xl dark:text-white">
                       {selectedAnatomy?.namePl ?? selectedProfile.muscleId}
                     </h2>
-                    {selectedAnatomy?.nameEn && (
-                      <div className="text-xs font-semibold text-[#52695b] dark:text-[#94b0a0]">
-                        {selectedAnatomy.nameEn}
+                    {selectedAnatomy?.nameLt && (
+                      <div className="mt-0.5 text-xs font-semibold italic text-emerald-700 dark:text-emerald-300">
+                        {capitalizeLatinTerm(selectedAnatomy.nameLt)}
                       </div>
                     )}
                     <p className="mt-2 text-sm font-semibold leading-relaxed text-[#2d4337] dark:text-[#d1e4d9]">
                       {selectedProfile.shortTaglinePl}
                     </p>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-1.5 sm:shrink-0">
-                    {selectedAnatomy && (
-                      <button
-                        type="button"
-                        onClick={() => onShowIn3D(selectedAnatomy)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border-b-2 border-emerald-700 bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-emerald-500"
-                      >
-                        <Box className="h-3.5 w-3.5" />
-                        <span>Eksplorator 3D</span>
-                      </button>
-                    )}
-                    {selectedLovettTest && onVisualizeClinicalTest && (
-                      <button
-                        type="button"
-                        onClick={() => onVisualizeClinicalTest(selectedLovettTest)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-extrabold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
-                      >
-                        <Stethoscope className="h-3.5 w-3.5" />
-                        <span>Test Lovetta</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompareIdA(selectedProfile.muscleId);
-                        if (selectedProfile.antagonistIds[0]) {
-                          setCompareIdB(selectedProfile.antagonistIds[0]);
-                        }
-                        setSubTab('reverse');
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border-2 border-[#c5dfd0] bg-[#f4faf6] px-3 py-1.5 text-xs font-extrabold text-emerald-900 transition hover:bg-emerald-50 dark:border-[#2a4a39] dark:bg-[#16291f] dark:text-emerald-200"
-                    >
-                      <ArrowLeftRight className="h-3.5 w-3.5" />
-                      <span>Porównaj</span>
-                    </button>
                   </div>
                 </div>
 
@@ -787,14 +797,14 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
             </div>
 
             {/* Joint pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5">
               {JOINT_GROUPS_META.map((j) => (
                 <button
                   key={j.id}
                   type="button"
                   data-testid={`reverse-joint-${j.id}`}
                   onClick={() => handleSelectJoint(j.id)}
-                  className={`shrink-0 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition ${
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-extrabold transition ${
                     selectedJoint === j.id
                       ? 'border-emerald-500 bg-emerald-600 text-white'
                       : 'border-[#d6e7dc] bg-[#f4faf6] text-[#354c3f] hover:bg-emerald-50 dark:border-[#233d2f] dark:bg-[#16291f] dark:text-[#c7dbcf]'
@@ -927,7 +937,7 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
             </div>
 
             {/* Featured quick pairs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5">
               {FEATURED_MUSCLE_COMPARISONS.map((pair) => (
                 <button
                   key={`${pair.idA}_${pair.idB}`}
@@ -936,7 +946,7 @@ export const MuscleActionsView: React.FC<MuscleActionsViewProps> = ({
                     setCompareIdA(pair.idA);
                     setCompareIdB(pair.idB);
                   }}
-                  className={`shrink-0 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition ${
+                  className={`rounded-xl border px-2.5 py-1.5 text-xs font-bold transition ${
                     compareIdA === pair.idA && compareIdB === pair.idB
                       ? 'border-emerald-500 bg-emerald-600 text-white'
                       : 'border-[#d6e7dc] bg-[#f4faf6] text-[#354c3f] hover:bg-emerald-50 dark:border-[#233d2f] dark:bg-[#16291f] dark:text-[#c7dbcf]'

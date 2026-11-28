@@ -265,11 +265,11 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
       );
       const targetEntry = ANATOMY_MAP[activeCase.stage4Locate3D.targetStructureId];
       const correctLabel = targetEntry
-        ? formatBilingualName(targetEntry.namePl, targetEntry.nameEn)
+        ? formatBilingualName(targetEntry.namePl, targetEntry.nameLt)
         : activeCase.stage4Locate3D.targetStructureId;
       const chosenLabel =
         stage4Selection.bilingualName ||
-        formatBilingualName(stage4Selection.namePl, stage4Selection.nameEn);
+        formatBilingualName(stage4Selection.namePl, stage4Selection.nameLt);
       return {
         stageIndex: 3,
         stageTitle: STAGE_TITLES[3],
@@ -1088,7 +1088,7 @@ export const PatientSimulator3DView: React.FC<PatientSimulator3DViewProps> = ({
                   <span>
                     {stage4Selection
                       ? stageCommitted && mode === 'learn'
-                        ? `Wybrano: ${stage4Selection.bilingualName || formatBilingualName(stage4Selection.namePl, stage4Selection.nameEn)}`
+                        ? `Wybrano: ${stage4Selection.bilingualName || formatBilingualName(stage4Selection.namePl, stage4Selection.nameLt)}`
                         : 'Zaznaczono strukturę na modelu 3D — kliknij „Zatwierdź”, aby ocenić wybór'
                       : 'Obróć / przybliż model 3D po lewej i kliknij podejrzewaną strukturę'}
                   </span>

@@ -1,5 +1,6 @@
 // src/data/bonyLandmarks.ts
 import { BonyLandmarkHotspot } from '../types/anatomy';
+import { formatBilingualName, translateMeshNameToPolish } from '../three/anatomyTranslator';
 
 export interface BonyLandmarkExtended extends BonyLandmarkHotspot {
   structureId?: string;
@@ -2637,6 +2638,107 @@ export const BONY_LANDMARKS: BonyLandmarkExtended[] = [
   }),
 ];
 
+const LANDMARK_LATIN_BY_BASE_ID: Record<string, string> = {
+  humerus_greater_tubercle: 'Tuberculum majus humeri',
+  humerus_lesser_tubercle: 'Tuberculum minus humeri',
+  humerus_intertubercular_sulcus: 'Sulcus intertubercularis',
+  humerus_deltoid_tuberosity: 'Tuberositas deltoidea',
+  humerus_medial_epicondyle: 'Epicondylus medialis humeri',
+  humerus_lateral_epicondyle: 'Epicondylus lateralis humeri',
+  scapula_coracoid_process: 'Processus coracoideus',
+  scapula_acromion: 'Acromion',
+  scapula_spine: 'Spina scapulae',
+  scapula_inferior_angle: 'Angulus inferior scapulae',
+  radius_radial_tuberosity: 'Tuberositas radii',
+  ulna_olecranon: 'Olecranon',
+  pelvis_asis: 'Spina iliaca anterior superior',
+  pelvis_ischial_tuberosity: 'Tuber ischiadicum',
+  femur_greater_trochanter: 'Trochanter major',
+  femur_lesser_trochanter: 'Trochanter minor',
+  patella_apex: 'Apex patellae',
+  tibia_tuberosity: 'Tuberositas tibiae',
+  tibia_pes_anserinus: 'Pes anserinus superficialis',
+  fibula_head: 'Caput fibulae',
+  calcaneus_tuberosity: 'Tuber calcanei',
+  mandible_angle: 'Angulus mandibulae',
+  shoulder_lig_coracoacromiale: 'Ligamentum coracoacromiale',
+  shoulder_labrum_glenoidale: 'Labrum glenoidale',
+  knee_acl: 'Ligamentum cruciatum anterius',
+  knee_meniscus_medialis: 'Meniscus medialis',
+  knee_mcl: 'Ligamentum collaterale tibiale',
+  vertebra_c7_spinous_process: 'Processus spinosus C7 (Vertebra prominens)',
+  vertebra_l4_spinous_process: 'Processus spinosus L4',
+  sacrum_median_crest: 'Crista sacralis mediana',
+  sternum_jugular_notch: 'Incisura jugularis sterni',
+  sternum_sternal_angle: 'Angulus sterni',
+  clavicle_conoid_tubercle: 'Tuberculum conoideum claviculae',
+  pelvis_psis: 'Spina iliaca posterior superior',
+  pelvis_aiis: 'Spina iliaca anterior inferior',
+  pelvis_iliac_crest: 'Crista iliaca',
+  tibia_gerdy_tubercle: 'Tuberculum tractus iliotibialis',
+  femur_medial_epicondyle: 'Epicondylus medialis femoris',
+  femur_lateral_epicondyle: 'Epicondylus lateralis femoris',
+  tibia_medial_malleolus: 'Malleolus medialis',
+  fibula_lateral_malleolus: 'Malleolus lateralis',
+  metatarsal5_tuberosity: 'Tuberositas ossis metatarsi V',
+  radius_styloid_process: 'Processus styloideus radii',
+  ulna_styloid_process: 'Processus styloideus ulnae',
+  temporal_mastoid_process: 'Processus mastoideus',
+  occipital_external_protuberance: 'Protuberantia occipitalis externa',
+  scapula_supraspinous_fossa: 'Fossa supraspinata',
+  scapula_infraspinous_fossa: 'Fossa infraspinata',
+  scapula_subscapular_fossa: 'Fossa subscapularis',
+  scapula_superior_angle: 'Angulus superior scapulae',
+  scapula_medial_border: 'Margo medialis scapulae',
+  scapula_lateral_border: 'Margo lateralis scapulae',
+  scapula_infraglenoid_tubercle: 'Tuberculum infraglenoidale',
+  clavicle_sternal_end: 'Extremitas sternalis claviculae',
+  clavicle_acromial_end: 'Extremitas acromialis claviculae',
+  humerus_head: 'Caput humeri',
+  humerus_surgical_neck: 'Collum chirurgicum humeri',
+  humerus_radial_groove: 'Sulcus nervi radialis',
+  humerus_anterior_shaft: 'Facies anterior corporis humeri',
+  humerus_trochlea_capitulum: 'Condylus humeri (Trochlea et capitulum)',
+  humerus_olecranon_fossa: 'Fossa olecrani',
+  radius_head_neck: 'Caput et collum radii',
+  ulna_coronoid_process: 'Processus coronoideus et tuberositas ulnae',
+  pelvis_iliac_fossa: 'Fossa iliaca',
+  pelvis_pubic_tubercle: 'Tuberculum pubicum',
+  femur_head: 'Caput femoris',
+  femur_neck: 'Collum femoris',
+  femur_linea_aspera: 'Linea aspera femoris',
+  femur_patellar_surface_condyles: 'Condyli et facies patellaris femoris',
+  tibia_soleal_line: 'Linea musculi solei',
+  tibia_anterior_lateral_shaft: 'Margo anterior et facies lateralis tibiae',
+  fibula_shaft_lateral: 'Facies lateralis fibulae',
+  pelvis_gluteal_surface: 'Facies glutea ossis ilium',
+  femur_gluteal_tuberosity: 'Tuberositas glutea femoris',
+  scapula_supraglenoid_tubercle: 'Tuberculum supraglenoidale',
+  humerus_lateral_supracondylar_ridge: 'Crista supracondylaris lateralis humeri',
+  tibia_medial_condyle_posterior: 'Facies posterior condyli medialis tibiae',
+  tibia_popliteal_surface: 'Facies poplitea tibiae',
+  metatarsal1_base: 'Basis ossis metatarsi I',
+  sacrum_pelvic_surface: 'Facies pelvica ossis sacri',
+  zygomatic_arch: 'Os zygomaticum et arcus zygomaticus',
+  temporal_fossa: 'Fossa temporalis',
+  mandible_coronoid_process: 'Processus coronoideus mandibulae',
+  rib1_scalene_tubercle: 'Tuberculum musculi scaleni anterioris',
+  vertebra_c5_transverse_process: 'Processus transversus vertebrae cervicalis',
+  rib4_anterior: 'Costa IV (facies anterolateralis)',
+  rib7_angle: 'Angulus costae VII',
+  vertebra_t6_transverse_process: 'Processus transversus Th6',
+  vertebra_t6_spinous_process: 'Processus spinosus Th6',
+  vertebra_l1_body: 'Corpus vertebrae lumbalis L1',
+  sternum_body_anterior: 'Facies anterior corporis sterni',
+  sternum_xiphoid: 'Processus xiphoideus sterni',
+  radius_pronator_tuberosity: 'Tuberositas pronatoria radii',
+  metacarpal2_base: 'Basis ossis metacarpi II',
+  hand_pisiform: 'Os pisiforme',
+  hand_middle_phalanx3: 'Phalanx media digiti III (aponeurosis dorsalis)',
+  rib12_inferior: 'Costa XII (margo inferior)',
+  foot_navicular_tuberosity: 'Tuberositas ossis navicularis',
+};
+
 for (const lm of BONY_LANDMARKS) {
   const geom = LANDMARK_GEOM_SPECS[lm.id];
   if (geom) {
@@ -2647,5 +2749,27 @@ for (const lm of BONY_LANDMARKS) {
     lm.normal = [geom.desiredNormal[0], geom.desiredNormal[1], geom.desiredNormal[2]];
     lm.zoneRadius = geom.zoneRadius;
     lm.minNormalDot = geom.minNormalDot;
+  }
+
+  // Upgrade bilingualName & attachedMuscles from English to Terminologia Anatomica Latin!
+  const baseId = lm.id.replace(/_(r|l)$/, '');
+  const cleanPlNoParens = lm.namePl
+    .replace(/\bSIAS\s*\/\s*ASIS\b/g, 'SIAS')
+    .replace(/\bSIPS\s*\/\s*PSIS\b/g, 'SIPS')
+    .replace(/\bSIAI\s*\/\s*AIIS\b/g, 'SIAI');
+  lm.namePl = cleanPlNoParens;
+  const lt = LANDMARK_LATIN_BY_BASE_ID[baseId] || translateMeshNameToPolish(lm.nameEn || lm.namePl).nameLt;
+  lm.nameLt = lt;
+  lm.bilingualName = formatBilingualName(lm.namePl, lt);
+
+  if (lm.attachedMuscles && lm.attachedMuscles.length > 0) {
+    lm.attachedMuscles = lm.attachedMuscles.map((item) => {
+      const m = item.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+      if (!m) return item;
+      const polishPart = m[1].trim();
+      const rawForeign = m[2].trim();
+      const trans = translateMeshNameToPolish(rawForeign);
+      return `${polishPart} (${trans.nameLt})`;
+    });
   }
 }

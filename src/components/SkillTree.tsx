@@ -94,7 +94,7 @@ export const SkillTree: React.FC<SkillTreeProps> = React.memo(
                       >
                         <Box className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         <span className="min-w-0 break-words">
-                          {formatBilingualName(structure.namePl, structure.nameEn)}
+                          {formatBilingualName(structure.namePl, structure.nameLt)}
                         </span>
                         <span className="font-mono-tabular shrink-0 text-amber-600 dark:text-amber-400">
                           ({wrongCount}×)

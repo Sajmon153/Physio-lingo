@@ -1,6 +1,6 @@
 import { ANATOMY_MAP } from '../data/anatomyDb';
 import { BONY_LANDMARKS, type BonyLandmarkExtended } from '../data/bonyLandmarks';
-import { formatBilingualName } from '../three/anatomyTranslator';
+import { capitalizeLatinTerm, formatBilingualName } from '../three/anatomyTranslator';
 import { isTypingAnswerCorrect, normalizeAnatomyAnswer, shuffleArray } from './gameLogic';
 
 export type PinExamRegion =
@@ -27,6 +27,7 @@ export interface PinExamQuestion {
   structureId: string;
   landmarkId?: string;
   targetNamePl: string;
+  targetNameLt?: string;
   targetNameEn?: string;
   boneNamePl?: string;
   roleHint?: 'pp' | 'pk' | 'landmark';
@@ -37,6 +38,7 @@ export interface PinExamQuestion {
 export interface PinExamSelectedPart {
   id: string;
   namePl: string;
+  nameLt?: string;
   nameEn?: string;
   structureId?: string;
 }
@@ -326,7 +328,8 @@ function buildStructureQuestion(
   systemGroup: 'muscle' | 'vessels' | 'nerves' | 'connective' | 'organs',
 ): PinExamQuestion {
   const entry = ANATOMY_MAP[structureId];
-  const label = formatBilingualName(entry.namePl, entry.nameEn);
+  const targetNameLt = capitalizeLatinTerm(entry.nameLt);
+  const label = formatBilingualName(entry.namePl, targetNameLt);
   const hint =
     systemGroup === 'muscle'
       ? `Unerwienie: ${entry.innervation}${entry.spinalSegments && entry.spinalSegments !== '—' ? ` (${entry.spinalSegments})` : ''}.`
@@ -338,6 +341,7 @@ function buildStructureQuestion(
     region,
     structureId,
     targetNamePl: entry.namePl,
+    targetNameLt,
     targetNameEn: entry.nameEn,
     clinicalHint: hint,
     prompt: `Wskaż: ${label}`,
@@ -349,7 +353,8 @@ function buildMuscleQuestion(region: PinExamRegion, structureId: string): PinExa
 }
 
 function buildLandmarkQuestion(region: PinExamRegion, lm: BonyLandmarkExtended): PinExamQuestion {
-  const label = formatBilingualName(lm.namePl, lm.nameEn);
+  const targetNameLt = capitalizeLatinTerm(lm.nameLt);
+  const label = formatBilingualName(lm.namePl, targetNameLt);
   const roleLabel =
     lm.type === 'pp'
       ? 'przyczep początkowy (PP)'
@@ -365,6 +370,7 @@ function buildLandmarkQuestion(region: PinExamRegion, lm: BonyLandmarkExtended):
     structureId: lm.structureId || lm.id,
     landmarkId: lm.id,
     targetNamePl: lm.namePl,
+    targetNameLt,
     targetNameEn: lm.nameEn,
     boneNamePl: lm.boneNamePl,
     roleHint: lm.type,
@@ -497,7 +503,7 @@ export function buildReversePinOptions(
   region: PinExamRegion = question.region,
   rng: () => number = Math.random,
 ): ReversePinOption[] {
-  const correctLabel = formatBilingualName(question.targetNamePl, question.targetNameEn);
+  const correctLabel = formatBilingualName(question.targetNamePl, question.targetNameLt);
   const targetNorm = normalizeAnatomyAnswer(question.targetNamePl);
 
   const gatherCandidates = (r: PinExamRegion): PinExamQuestion[] => {
@@ -538,7 +544,7 @@ export function buildReversePinOptions(
       seenNorm.add(norm);
       distractors.push({
         id: candidate.id,
-        label: formatBilingualName(candidate.targetNamePl, candidate.targetNameEn),
+        label: formatBilingualName(candidate.targetNamePl, candidate.targetNameLt),
         isCorrect: false,
       });
     }
@@ -568,16 +574,19 @@ export function evaluateReverseTypingAnswer(
 ): boolean {
   const accepted = new Set<string>();
   accepted.add(question.targetNamePl);
+  if (question.targetNameLt) {
+    accepted.add(question.targetNameLt);
+  }
   if (question.targetNameEn) {
     accepted.add(question.targetNameEn);
   }
-  // Allow without parenthetical side/detail suffixes
   const strippedPl = question.targetNamePl.replace(/\s*\([^)]*\)/g, '').trim();
   if (strippedPl) accepted.add(strippedPl);
 
   const entry = ANATOMY_MAP[question.structureId];
   if (entry) {
     accepted.add(entry.namePl);
+    if (entry.nameLt) accepted.add(entry.nameLt);
     if (entry.nameEn) accepted.add(entry.nameEn);
     for (const alias of entry.aliases) {
       accepted.add(alias);
